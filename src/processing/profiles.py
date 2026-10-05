@@ -34,3 +34,20 @@ def load_profile_studiolot(profile_path: Path) -> dict[str, Any]:
     if not profile_path.exists():
         raise ConfigurationError(f"Profile not found: {profile_path}")
     return _parse_profile_yaml(profile_path)
+
+
+def preset_reference_urls(profile: dict[str, Any]) -> list[str]:
+    """Return a profile's optional ``reference_images`` list, validated.
+
+    Absent or ``None`` → ``[]`` (the byte-identical path). A non-list, or a
+    list holding a non-string entry, is malformed and raises
+    ``ConfigurationError`` (fail loud, never a silent drop).
+    """
+    value = profile.get("reference_images")
+    if value is None:
+        return []
+    if not isinstance(value, list) or not all(isinstance(u, str) for u in value):
+        raise ConfigurationError(
+            "profile 'reference_images' must be a list of URL strings"
+        )
+    return list(value)

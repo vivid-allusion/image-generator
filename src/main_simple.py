@@ -92,7 +92,7 @@ def _report_results(results: list[Any], placeholders: int = 0) -> int:
 
 def _execute_pipeline(ctx: PipelineContext) -> int:
     """Run the core generation pipeline: build inputs → run → report → log."""
-    inputs = build_inputs(ctx.md_files, ctx.platform, ctx.input_root)
+    inputs = build_inputs(ctx.md_files, ctx.platform, ctx.input_root, profile=ctx.profile)
     results = _run_with_progress(ctx.engine, inputs)
 
     payloads = compose_run_payloads(ctx, results)

@@ -12,6 +12,7 @@ from .constants import DEFAULT_PLATFORM, MEDIA_TYPE
 from .datatypes import MarkdownFile
 from .engine_contract import validate_input_file
 from .engine_loader import EngineLoadContext, copy_standby_profiles, load_engine
+from .processing.profiles import preset_reference_urls
 from .utils.path_resolver import relative_posix
 
 
@@ -87,13 +88,21 @@ def auto_install_engine(platform: str) -> bool:
 
 
 def build_inputs(
-    md_files: list[MarkdownFile], platform: str, input_root: Path | None = None
+    md_files: list[MarkdownFile],
+    platform: str,
+    input_root: Path | None = None,
+    profile: dict[str, Any] | None = None,
 ) -> list[Any]:
     """Construct InputFile objects using the Engine's datatype.
 
     input_root enables output files to mirror the input folder structure:
     each input's directory relative to input_root is passed to the Engine
     as metadata["relative_dir"].
+
+    ``profile`` carries the optional ``reference_images`` list composed by
+    the TUI from a preset's embedded reference media. The preset's URLs are
+    appended *after* each Markdown file's own ``reference_urls`` (the run's
+    bullets are the subject; the preset's media is its own support).
     """
     try:
         pkg = importlib.import_module(f"engine_{platform}")
@@ -103,11 +112,12 @@ def build_inputs(
             f"Engine '{platform}' is missing or does not export InputFile: {e}"
         ) from e
     validate_input_file(InputFile, platform)
+    preset_refs = preset_reference_urls(profile) if profile else []
     return [
         InputFile(
             path=b["path"],
             prompt=b["prompt"],
-            reference_urls=b["reference_urls"],
+            reference_urls=[*b["reference_urls"], *preset_refs],
             metadata={"relative_dir": _relative_dir(b["path"].parent, input_root)},
         )
         for b in md_files

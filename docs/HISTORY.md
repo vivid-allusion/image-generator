@@ -10,6 +10,11 @@
 
 ## Session History
 
+### 2026-10-05 — W22 phase_1 (M1): preset reference media reaches the Engine boundary
+- New `src/processing/profiles.py::preset_reference_urls()` validates the optional profile `reference_images` list: absent/`None` → `[]`; a non-list or a non-string entry → `ConfigurationError` (fail loud).
+- `src/engine_helpers.py::build_inputs(..., profile=…)` merges `[*md_file.reference_urls, *preset_refs]` (bullet first; empty/absent = today's list); `src/main_simple.py::_execute_pipeline` passes `ctx.profile`.
+- New `tests/test_preset_reference_media.py` (stub engine via `sys.modules`); gate 92 passed / 1 skipped / 0 failures, ruff clean; `main_simple.py` remains a 353-line accepted-divergence entry point.
+
 ### 2026-09-05 — Session 14: Systematic refactor from TODO backlog (32/32)
 - Spec: `USER-FILES/07.TEMP/260905_111816_refactor_report.md` (refactor analysis) → structured TODO.md (32 tasks: 3 High, 15 Med, 14 Low with IDs, effort points, pairings).
 - **T01/PipelineContext:** New `src/processing/context.py` — `PipelineContext` dataclass collapses the 6-9 param signatures of `compose_payload`, `compose_run_payloads`, `write_placeholders`, `write_run_logs`, `_execute_pipeline`. `_execute_pipeline` 9 params/88L → 1 param/~25L; progress display extracted to `_run_with_progress()` (documents the `_on_progress` swap as the de-facto Vehicle↔Engine progress contract — T04/T22).
