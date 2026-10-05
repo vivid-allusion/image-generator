@@ -10,6 +10,10 @@
 
 ## Session History
 
+### 2026-10-05 — W22 phase_3 (M3): stub-engine engine-boundary pilot
+- New companion `tests/test_preset_reference_media_pilot.py` (keeps both W22 test files under the soft 250): the pilot drives the real `_execute_pipeline` with a stub engine and asserts `[bullet_ref, preset_one, preset_two]` at the boundary, the input dir untouched, and payload `preset_reference_urls` / `reference_urls` / `schema == 1`; adds a `--dry-run` → `PreflightExit` test and a CLI-flag regression lock (the profile is the only transport).
+- First verifier pass REJECT (missing dry-run/CLI evidence; R2 manual command unrecorded); fixed and re-verified APPROVE. Gate 97 passed / 1 skipped / 0 failures, ruff clean. No `src/` change.
+
 ### 2026-10-05 — W22 phase_2 (M2): recipe provenance for a preset's reference media
 - `src/processing/payload.py::compose_payload` adds the optional `preset_reference_urls` key (the profile's `reference_images`, authored order) only when non-empty; `reference_urls` keeps its meaning and the recipe `schema` stays `1` (additive, no fork).
 - New tests 5–6 (`test_compose_payload_records_preset_reference_urls`, `test_compose_payload_omits_key_when_no_preset_refs`); gate 94 passed / 1 skipped / 0 failures, ruff clean.

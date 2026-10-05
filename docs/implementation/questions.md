@@ -33,3 +33,23 @@ No blocking questions. E4 is fully specified: import `preset_reference_urls`
 from `.profiles`, compute `preset_refs` once, and add the payload key only when
 non-empty; `schema` stays `1` and `write_run_logs` serializes the payload verbatim
 (no writer change). No conflict with AGENTS.md or Part 1's landed behaviour.
+
+## phase_3.md
+
+1. Drive the pilot through the real `main()` CLI in a subprocess (studiolot
+   mode, `--platform stub`), or through a deterministic in-repo integration test
+   via `_execute_pipeline` with a stub engine in `sys.modules`?
+
+**AGENT ANSWER:** In-repo integration test through `_execute_pipeline` with the
+stub engine. Plan §5 explicitly allows "IG's test fixtures for the unit-level
+variant"; it is offline and deterministic and proves the same three
+engine-boundary facts (order, `--input_dir` unchanged, payload provenance). The
+headless CLI pilot is recorded for the Manager/Owner as the manual confirmation.
+
+**USER RESPONSE:**
+```
+```
+
+No other blocking questions: phase_3 adds no `src/` change (self-contained test
+scaffolding), and the W95 studiolot half that composes `reference_images` is
+already shipped.
