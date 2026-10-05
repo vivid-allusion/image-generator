@@ -10,6 +10,10 @@
 
 ## Session History
 
+### 2026-10-05 — W22 phase_2 (M2): recipe provenance for a preset's reference media
+- `src/processing/payload.py::compose_payload` adds the optional `preset_reference_urls` key (the profile's `reference_images`, authored order) only when non-empty; `reference_urls` keeps its meaning and the recipe `schema` stays `1` (additive, no fork).
+- New tests 5–6 (`test_compose_payload_records_preset_reference_urls`, `test_compose_payload_omits_key_when_no_preset_refs`); gate 94 passed / 1 skipped / 0 failures, ruff clean.
+
 ### 2026-10-05 — W22 phase_1 (M1): preset reference media reaches the Engine boundary
 - New `src/processing/profiles.py::preset_reference_urls()` validates the optional profile `reference_images` list: absent/`None` → `[]`; a non-list or a non-string entry → `ConfigurationError` (fail loud).
 - `src/engine_helpers.py::build_inputs(..., profile=…)` merges `[*md_file.reference_urls, *preset_refs]` (bullet first; empty/absent = today's list); `src/main_simple.py::_execute_pipeline` passes `ctx.profile`.

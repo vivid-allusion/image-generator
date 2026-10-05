@@ -26,3 +26,10 @@ No other blocking questions: the merge order (bullet first, preset appended),
 the accessor's single home (`src/processing/profiles.py`), the loud
 `ConfigurationError` on malformed input, and the `profile=None` default are all
 fixed by the plan and consistent with AGENTS.md.
+
+## phase_2.md
+
+No blocking questions. E4 is fully specified: import `preset_reference_urls`
+from `.profiles`, compute `preset_refs` once, and add the payload key only when
+non-empty; `schema` stays `1` and `write_run_logs` serializes the payload verbatim
+(no writer change). No conflict with AGENTS.md or Part 1's landed behaviour.

@@ -28,6 +28,7 @@ from .payload_containers import (
     read_png,
     read_webp,
 )
+from .profiles import preset_reference_urls
 
 MAX_JPEG_PAYLOAD = 60_000
 
@@ -55,6 +56,7 @@ def compose_payload(
 ) -> dict[str, Any]:
     prefix = str(ctx.profile.get("prompt_prefix", "") or "")
     suffix = str(ctx.profile.get("prompt_suffix", "") or "")
+    preset_refs = preset_reference_urls(ctx.profile)
     raw = md_file["prompt"]
     payload: dict[str, Any] = {
         "schema": 1,
@@ -74,6 +76,8 @@ def compose_payload(
         "media_type": str(ctx.profile.get("media_type") or "image"),
         "output_file": out_path.name,
     }
+    if preset_refs:
+        payload["preset_reference_urls"] = preset_refs
     if error is not None:
         payload["error"] = error
     return payload
