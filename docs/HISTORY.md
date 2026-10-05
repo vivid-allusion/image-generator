@@ -10,6 +10,10 @@
 
 ## Session History
 
+### 2026-10-05 — W22 phase_4 (M4) + plan complete: doc touch-points proposed; W22 retired
+- Propose-only (Owner-gated): recorded the optional top-level `reference_images` profile key and the append rule for `ARCHITECTURE.md` "Profiles and endpoints" and `AGENTS.md` "Configuration" in `docs/implementation/questions.md`; neither doc was edited.
+- W22 complete: parts 1–4 landed (profile→Engine merge, recipe provenance, stub-engine pilot, doc proposal). Final gate 97 passed / 1 skipped / 0 failures, ruff clean; `docs/implementation/plan/` retired.
+
 ### 2026-10-05 — W22 phase_3 (M3): stub-engine engine-boundary pilot
 - New companion `tests/test_preset_reference_media_pilot.py` (keeps both W22 test files under the soft 250): the pilot drives the real `_execute_pipeline` with a stub engine and asserts `[bullet_ref, preset_one, preset_two]` at the boundary, the input dir untouched, and payload `preset_reference_urls` / `reference_urls` / `schema == 1`; adds a `--dry-run` → `PreflightExit` test and a CLI-flag regression lock (the profile is the only transport).
 - First verifier pass REJECT (missing dry-run/CLI evidence; R2 manual command unrecorded); fixed and re-verified APPROVE. Gate 97 passed / 1 skipped / 0 failures, ruff clean. No `src/` change.

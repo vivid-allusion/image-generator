@@ -53,3 +53,30 @@ headless CLI pilot is recorded for the Manager/Owner as the manual confirmation.
 No other blocking questions: phase_3 adds no `src/` change (self-contained test
 scaffolding), and the W95 studiolot half that composes `reference_images` is
 already shipped.
+
+## phase_4.md
+
+Deliverable (propose-only; Owner-gated — do **not** apply): document the optional
+top-level `reference_images` profile key and the append rule. Both proposed homes
+exist (`ARCHITECTURE.md` "Profiles and endpoints" line 72; `AGENTS.md`
+"Configuration" line 146); the brief's `docs/architecture/**` does not exist on
+this tree.
+
+Proposed `ARCHITECTURE.md` → "Profiles and endpoints" (after the existing first
+paragraph):
+
+> A composed profile may also carry an optional top-level `reference_images`
+> list — a preset's embedded reference media — whose URLs are appended after
+> each Markdown file's own reference bullets before they reach the Engine.
+
+Proposed `AGENTS.md` → "Configuration" (new bullet):
+
+> - Profile format may include an optional top-level `reference_images` list
+>   (URLs); they are appended after each Markdown file's own `reference_urls`.
+
+Optional (no code): a one-line docstring note on `src/engine_contract.py`'s
+`reference_urls` field — not proposed for edit now.
+
+No blocking questions. Neither doc is edited in this part; the recipe `schema`
+stays `1`, the frozen formats are untouched, and no engine or `video-generator`
+change is needed.
