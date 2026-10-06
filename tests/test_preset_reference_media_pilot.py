@@ -94,6 +94,7 @@ def test_cross_repo_pilot_stub_engine_boundary(stub_engine, monkeypatch, tmp_pat
         output_dir=tmp_path / "out",
         input_root=input_dir,
         save_payloads=False,
+        logs=True,
         run_mode="studiolot",
     )
 
@@ -154,6 +155,8 @@ def test_no_new_cli_flag_profile_is_the_only_transport():
         "--dry-run",
         "--debug",
         "--verbose",
+        "-l",
+        "--logs",
         "--cost-estimation",
         "--force-png",
         "--no-save-payloads",

@@ -10,6 +10,12 @@
 
 ## Session History
 
+### 2026-10-06 — W32 phase_1 (M1): IG run logs become opt-in (`-l`/`--logs`)
+- `src/cli.py` adds the `-l`/`--logs` `store_true` flag (default off); `src/processing/context.py` adds the resolved `PipelineContext.logs` boolean.
+- `src/main_simple.py` adds `_logs_enabled(args, run_mode)` (flag **and** standalone), wires it into `_make_pipeline_context`, gates `write_run_logs` under `ctx.logs`, and gates `start_output_capture()` in `main`; studiolot (driven) mode never logs even with `-l`.
+- Tests: `_run_pipeline` gains `logs: bool = True` (existing log-content assertions unchanged); two stale W22 pilot assertions updated (the exact CLI flag set now includes `-l`/`--logs`; the pilot's payload-capture hook sets `logs=True`). No engine/profile/TOML change.
+- Verifier APPROVE; gate 97 passed / 1 skipped / 0 failures, ruff clean.
+
 ### 2026-10-05 — W22 phase_4 (M4) + plan complete: doc touch-points proposed; W22 retired
 - Propose-only (Owner-gated): recorded the optional top-level `reference_images` profile key and the append rule for `ARCHITECTURE.md` "Profiles and endpoints" and `AGENTS.md` "Configuration" in `docs/implementation/questions.md`; neither doc was edited.
 - W22 complete: parts 1–4 landed (profile→Engine merge, recipe provenance, stub-engine pilot, doc proposal). Final gate 97 passed / 1 skipped / 0 failures, ruff clean; `docs/implementation/plan/` retired.

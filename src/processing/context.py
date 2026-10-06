@@ -22,5 +22,6 @@ class PipelineContext:
     output_dir: Path
     input_root: Path | None = None
     save_payloads: bool = True
+    logs: bool = False
     run_mode: str = "standalone"
     cli_args: dict[str, Any] = field(default_factory=dict)

@@ -103,10 +103,16 @@ def _execute_pipeline(ctx: PipelineContext) -> int:
         payloads=payloads if ctx.save_payloads else None,
     )
     exit_code = _report_results(results, len(placeholders))
-    write_run_logs(generated + placeholders, ctx.output_dir, ctx, payloads, results)
+    if ctx.logs:
+        write_run_logs(generated + placeholders, ctx.output_dir, ctx, payloads, results)
     if ctx.save_payloads:
         embed_payloads(results, payloads)
     return exit_code
+
+
+def _logs_enabled(args: Any, run_mode: str) -> bool:
+    """Run logs are opt-in (-l/--logs) and standalone-only."""
+    return bool(getattr(args, "logs", False)) and run_mode == "standalone"
 
 
 def _make_pipeline_context(
@@ -128,6 +134,7 @@ def _make_pipeline_context(
         output_dir=output_dir,
         input_root=input_root,
         save_payloads=args.save_payloads,
+        logs=_logs_enabled(args, run_mode),
         run_mode=run_mode,
         cli_args=vars(args),
     )
@@ -209,7 +216,9 @@ def _resolve_engine_for_studiolot(
 def main() -> int:
     args = parse_args()
     is_studiolot = bool(args.profile or args.input_dir or args.output_dir)
-    start_output_capture()
+    run_mode = "studiolot" if is_studiolot else "standalone"
+    if _logs_enabled(args, run_mode):
+        start_output_capture()
     setup_logging(debug=args.debug, verbose=args.verbose)
 
     logger.debug("=" * 60)

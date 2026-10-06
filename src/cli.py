@@ -45,6 +45,13 @@ _ARGUMENTS: list[_ArgumentSpec] = [
         "kwargs": {"action": "store_true", "help": "Enable verbose (INFO level) output"},
     },
     {
+        "flags": ["-l", "--logs"],
+        "kwargs": {
+            "action": "store_true",
+            "help": "Write run logs beside generated files (standalone only; default off)",
+        },
+    },
+    {
         "flags": ["--cost-estimation"],
         "kwargs": {"action": "store_true", "help": "Estimate costs without generating"},
     },

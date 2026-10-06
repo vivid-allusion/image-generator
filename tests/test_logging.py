@@ -170,6 +170,7 @@ def _run_pipeline(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
     save_payloads: bool = True,
+    logs: bool = True,
     fail_all: bool = False,
 ) -> dict[str, str]:
     _install_stub_engine_module(monkeypatch)
@@ -186,6 +187,7 @@ def _run_pipeline(
         output_dir=tmp_path,
         input_root=Path("in"),
         save_payloads=save_payloads,
+        logs=logs,
         run_mode="studiolot",
         cli_args={"dry_run": False},
     )
