@@ -10,6 +10,11 @@
 
 ## Session History
 
+### 2026-10-06 — W32 phase_2 (M2) + plan complete: IG logging tests; W32 retired
+- New tests in `tests/test_logging.py`: `test_default_run_writes_no_log` (logs=False → no `.log`, media still written), `test_logs_flag_writes_log` (`0-a.log`/`1-b.log`), `TestLogsFlag` (`parse_args` defaults off; `-l`/`--logs` both set it; `_logs_enabled` table is standalone-only), and `test_make_pipeline_context_resolves_logs`.
+- Extended, not replaced: every pre-existing log-content assertion retained. Verifier APPROVE; gate 107 passed / 1 skipped / 0 failures, ruff clean.
+- W32 IG half complete (parts 1–2). `docs/implementation/plan/` retired. Owner-gated author verification and the Video Generator half (plan §3b/§4b) remain end-of-build / a separate cross-repo job.
+
 ### 2026-10-06 — W32 phase_1 (M1): IG run logs become opt-in (`-l`/`--logs`)
 - `src/cli.py` adds the `-l`/`--logs` `store_true` flag (default off); `src/processing/context.py` adds the resolved `PipelineContext.logs` boolean.
 - `src/main_simple.py` adds `_logs_enabled(args, run_mode)` (flag **and** standalone), wires it into `_make_pipeline_context`, gates `write_run_logs` under `ctx.logs`, and gates `start_output_capture()` in `main`; studiolot (driven) mode never logs even with `-l`.

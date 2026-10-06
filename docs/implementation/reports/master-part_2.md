@@ -3,8 +3,8 @@
 > Per-unit report (PLAN §4.4), written by `/part-close` from actual gate and verifier results — never from memory.
 
 - **Status:** DONE
-- **Part:** phase_2.md (M2 — recipe payload provenance)
-- **Date:** 2026-10-05T19:12:28Z
+- **Part:** phase_2.md (M2 — IG logging tests: default-off, flag-on, standalone-only, context resolution; **last unit**)
+- **Date:** 2026-10-06T11:02:00Z
 - **Repo / branch:** /home/admin/GENERATORS/image-generator · master
 - **Commit:** —
 
@@ -12,31 +12,36 @@
 
 | Gate | Exact command | Exit | Result |
 |---|---|---|---|
-| Unit `## Verification` | `./venv/bin/python -m pytest tests/ -q` | 0 | pass — 94 passed, 1 skipped, 0 failures |
+| Unit `## Verification` | `./venv/bin/python -m pytest tests/ -q` | 0 | pass — 107 passed, 1 skipped, 0 failures (after Part 1: 97/1; +10 parametrized tests) |
+| Unit `## Verification` (focused) | `./venv/bin/python -m pytest tests/test_logging.py -q` | 0 | pass — 30 passed, 1 skipped |
 | Resolver `verify=` | `./venv/bin/python -m pytest tests/` | 0 | pass |
 | Resolver `lint=` | `./venv/bin/ruff check` | 0 | pass — All checks passed! |
-| File-size scan | `wc -l` over changed files | — | breaches: none (`payload.py` 188, test file 173) |
+| File-size scan | `wc -l` over changed `.py` | — | `tests/test_logging.py` 386 (soft 250, under hard 400); `main_simple.py` 362 (pre-existing soft); none over hard 400 |
 
-Part 1 added 6 tests; Part 2 adds 2 → 94 passed / 1 skipped, 0 failures. No
-existing test weakened.
+Every pre-existing `TestPerFileLogs` / `TestFallbackWriter` / `TestRealLogReplay` assertion is retained; the 6 named tests (10 parametrized cases) are appended.
 
 ## Verifier verdict
 
-`VERDICT: APPROVE` — the pinned `verifier` subagent, fresh context, no tools.
+`VERDICT: APPROVE` — the pinned `verifier` subagent, fresh context, no tools (`ses_eef22dce1ffe9Dqq4kmppklXeY`).
 
-- R1 `compose_payload` import + `preset_refs` + optional key block: MET.
-- R2 tests 5–6 (`test_compose_payload_records_preset_reference_urls`, `test_compose_payload_omits_key_when_no_preset_refs`): MET.
-- Whole-plan AC1/AC2 (Part 1, still green in the full suite): MET. AC3 (optional key, schema 1): MET. AC4 (call site + green gate): MET.
+- R1 `test_default_run_writes_no_log` (no `.log`, media exists): MET.
+- R2 `test_logs_flag_writes_log` (`{0-a.log, 1-b.log}`): MET.
+- R3 `test_parse_args_default_logs_off`: MET.
+- R4 `test_parse_args_l_short_and_long`: MET.
+- R5 `test_logs_enabled_is_standalone_only` (4-row table): MET.
+- R6 `test_make_pipeline_context_resolves_logs`: MET.
+- Constraint (extend not replace; keep existing assertions) + AC3 + deterministic gate: MET.
 - MUST-FIX: none.
 
 ## Evidence per acceptance criterion
 
-- "compose_payload adds the optional preset_reference_urls key only when the preset list is non-empty and keeps the recipe schema equal to 1.": `src/processing/payload.py` hunk `@@ -74,6 +76,8 @@` adds `if preset_refs: payload["preset_reference_urls"] = preset_refs`; `test_compose_payload_records_preset_reference_urls` asserts `payload["preset_reference_urls"] == PRESET` and `payload["schema"] == 1`; `test_compose_payload_omits_key_when_no_preset_refs` asserts the key is absent and `set(payload) == PRE_W22_KEYS` for both `{}` and `{"reference_images": []}`.
-- "_execute_pipeline passes ctx.profile to build_inputs, and the W22 preset-reference tests pass under the repo gate with zero failures.": gate `94 passed, 1 skipped in 1.20s`; `./venv/bin/ruff check` → `All checks passed!`.
+- "tests/test_logging.py contains the default-off, flag-on, standalone-only, and context-resolution logging tests…": `tests/test_logging.py` hunk `@@ -322,3 +323,64 @@` (the 6 tests); focused run 30 passed / 1 skipped.
+- "…and ./venv/bin/python -m pytest tests/ passes with zero failures": gate `107 passed, 1 skipped`, exit 0; ruff `All checks passed!`.
+- Whole-plan AC1/AC2 (landed in `phase_1.md`): `src/cli.py` `@@ -44,6 +44,13 @@`; `src/main_simple.py` `_logs_enabled`/wiring hunks.
 
 ## Design
 
-- **Marker:** `**Design:** no — recipe JSON provenance; machine-readable, no user-facing surface.` (`tools/design-scope.sh` → `DESIGN=no`).
+- **Marker:** `**Design:** no — tests only; no user-facing surface.` (resolved by `tools/design-scope.sh`; `DESIGN=no`).
 - **Captures:** not applicable — DESIGN=no.
 - **Comparison:** no mock-up.
 - **Design verdict:** not run — DESIGN=no (D8).
@@ -49,4 +54,4 @@ existing test weakened.
 
 ## Next pointer
 
-- `phase`: `phase_3.md` (M3 — cross-repo stub-engine engine-boundary proof)
+- `phase`: plan retired — `docs/implementation/plan/` deleted; `test ! -d docs/implementation/plan` asserted.

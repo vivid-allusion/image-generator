@@ -55,3 +55,35 @@ changed. `/part-exec` gate is green (`97 passed, 1 skipped`; ruff clean).
 **USER RESPONSE:**
 ```
 ```
+
+## phase_2.md
+
+No blocking questions. The six tests are pinned by plan §4a and build on Part 1's
+landed wiring:
+
+1. Test 1 reuses `_run_pipeline(..., logs=False)`; that fixture asserts
+   `exit_code == 1` and returns the `*.log` map (now `{}`).
+
+**AGENT ANSWER:** Call `_run_pipeline(monkeypatch, tmp_path, logs=False)`, assert
+`list(tmp_path.glob("*.log")) == []` and the media file (`0-a.png`) still exists —
+the fixture's own `exit_code == 1` assertion already holds.
+
+**USER RESPONSE:**
+```
+```
+
+2. Test 6 calls `_make_pipeline_context(...)`, which reads `args.save_payloads` and
+`_logs_enabled(args, run_mode)` (which reads `args.logs`).
+
+**AGENT ANSWER:** Pass `args=SimpleNamespace(save_payloads=True, logs=True)` and a
+`StubEngine(tmp_path)` for `engine`; assert `ctx.logs is True` for
+`run_mode="standalone"` and `is False` for `"studiolot"` (plan §4a test 6). No new
+production code.
+
+**USER RESPONSE:**
+```
+```
+
+No other blocking questions: tests are offline (stub engine; `StringIO` capture),
+the suite gate stays `./venv/bin/python -m pytest tests/`, and this is the last
+unit → `/part-close` retires `docs/implementation/plan/`.

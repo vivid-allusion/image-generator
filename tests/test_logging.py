@@ -9,7 +9,8 @@ from types import ModuleType, SimpleNamespace
 import pytest
 from PIL import Image
 
-from src.main_simple import _execute_pipeline
+from src.cli import parse_args
+from src.main_simple import _execute_pipeline, _logs_enabled, _make_pipeline_context
 from src.processing.context import PipelineContext
 from src.processing.payload import read_payload
 from src.utils import logging as capture_mod
@@ -322,3 +323,64 @@ class TestRealLogReplay:
         assert len(out) < 100_000
         assert "Complete: " in out
         assert len(out.splitlines()) > 5
+
+
+def test_default_run_writes_no_log(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    logs = _run_pipeline(monkeypatch, tmp_path, logs=False)
+
+    assert logs == {}
+    assert list(tmp_path.glob("*.log")) == []
+    assert (tmp_path / "0-a.png").exists()
+
+
+def test_logs_flag_writes_log(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    logs = _run_pipeline(monkeypatch, tmp_path, logs=True)
+
+    assert set(logs) == {"0-a.log", "1-b.log"}
+
+
+class TestLogsFlag:
+    def test_parse_args_default_logs_off(self, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.setattr(sys, "argv", ["prog"])
+        assert parse_args().logs is False
+
+    @pytest.mark.parametrize("argv", [["prog", "-l"], ["prog", "--logs"]])
+    def test_parse_args_l_short_and_long(
+        self, monkeypatch: pytest.MonkeyPatch, argv: list[str]
+    ):
+        monkeypatch.setattr(sys, "argv", argv)
+        assert parse_args().logs is True
+
+    @pytest.mark.parametrize(
+        ("logs", "run_mode", "expected"),
+        [
+            (True, "standalone", True),
+            (False, "standalone", False),
+            (True, "studiolot", False),
+            (False, "studiolot", False),
+        ],
+    )
+    def test_logs_enabled_is_standalone_only(
+        self, logs: bool, run_mode: str, expected: bool
+    ):
+        assert _logs_enabled(SimpleNamespace(logs=logs), run_mode) is expected
+
+
+def test_make_pipeline_context_resolves_logs(tmp_path: Path):
+    args = SimpleNamespace(save_payloads=True, logs=True)
+    engine = StubEngine(tmp_path)
+
+    def _ctx(run_mode: str) -> PipelineContext:
+        return _make_pipeline_context(
+            md_files=[_md("in/a.md", "a castle")],
+            engine=engine,
+            platform="replicate",
+            profile=_profile(),
+            output_dir=tmp_path,
+            input_root=Path("in"),
+            args=args,
+            run_mode=run_mode,
+        )
+
+    assert _ctx("standalone").logs is True
+    assert _ctx("studiolot").logs is False
