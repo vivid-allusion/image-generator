@@ -147,6 +147,7 @@ main() → _run_studiolot()
 
 - Profiles: YAML files in `USER-FILES/03.PROFILES/` (production) or `USER-FILES/02.STANDBY/` (engine-seeded backup)
 - Profile format: `platform`, `parameters`, `prompt_prefix`, `prompt_suffix`, `pricing`, `paths`, `delay_between_requests`
+- Profile format may include an optional top-level `reference_images` list (URLs); they are appended after each Markdown file’s own `reference_urls`.
 - Standby profiles are engine-owned: `02.STANDBY/` is seeded by `copy_standby_profiles()` after engine install. Starts empty (`.gitkeep` only). Content is gitignored — only `.gitkeep` is tracked.
 - API keys: env vars per platform (`REPLICATE_API_TOKEN`, `FAL_KEY`, `OPENROUTER_API_KEY`, `GOOGLE_API_KEY`, `BEEBLE_API_KEY`, `EVOLINK_API_KEY`)
 - .env file: loaded from project root on startup

@@ -77,6 +77,10 @@ prompt prefix/suffix, and paths. When you generate from the TUI, the profile is
 preset. Run a Generator standalone and it reads a profile from its own
 `USER-FILES/03.PROFILES/` folder instead.
 
+A composed profile may also carry an optional top-level `reference_images`
+list — a preset’s embedded reference media — whose URLs are appended after
+each Markdown file’s own reference bullets before they reach the Engine.
+
 **Endpoint definitions** (the catalog of models and their parameters) live in
 the Engine repos as TOML files. Adding a model is usually a single TOML file —
 one of the highest-impact contributions you can make.
