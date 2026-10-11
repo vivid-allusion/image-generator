@@ -99,6 +99,48 @@ class TestExtractPromptTextWithComments:
         assert extract_prompt_text(content) == "New prompt"
 
 
+class TestLeadingImageBookmarkIgnored:
+    """A leading markdown image (previous generation) is not the prompt."""
+
+    def test_relative_image_on_line_1_ignored(self):
+        content = (
+            "![generated](../05.OUTPUT/261010_203922_IMG/261010_203949-0077-1.png)\n"
+            "\n"
+            "1944, a snowless winter plain on the Eastern Front in Hungary."
+        )
+        assert (
+            extract_prompt_text(content)
+            == "1944, a snowless winter plain on the Eastern Front in Hungary."
+        )
+
+    def test_remote_image_on_line_1_ignored(self):
+        content = "![img](https://host/a.png)\nThe actual prompt"
+        assert extract_prompt_text(content) == "The actual prompt"
+        assert extract_all_image_urls(content) == []
+
+    def test_reference_below_prompt_still_collected(self):
+        content = "![generated](../out/prev.png)\nThe actual prompt\n![ref](https://host/ref.jpg)"
+        assert extract_all_image_urls(content) == ["https://host/ref.jpg"]
+
+    def test_multiple_leading_images_skipped(self):
+        content = "![a](../a.png)\n![b](https://host/b.png)\nPrompt"
+        assert extract_prompt_text(content) == "Prompt"
+
+    def test_text_line_with_inline_image_still_prompt(self):
+        content = (
+            "Make a poster with ![logo](https://host/logo.png) in the corner\n"
+            "![ref](https://host/x.jpg)"
+        )
+        assert (
+            extract_prompt_text(content)
+            == "Make a poster with ![logo](https://host/logo.png) in the corner"
+        )
+
+    def test_only_an_image_raises_no_prompt(self):
+        with pytest.raises(ValueError, match="No prompt"):
+            extract_prompt_text("![generated](../out/img.png)")
+
+
 class TestValidateImageUrls:
     def test_non_ascii_url_is_encoded_before_request(self, monkeypatch):
         seen = {}

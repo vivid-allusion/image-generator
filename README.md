@@ -85,7 +85,7 @@ A cinematic portrait in soft lighting
 ![reference](https://example.com/side-view.jpg)
 ```
 
-- Line 1: text prompt
+- Line 1: text prompt (a leading line that is only a markdown image, e.g. a previous generation kept as a bookmark, is ignored — the prompt is the first non-image text line)
 - Following lines: markdown image URLs or raw `https://` URLs (text-to-image works with no URLs)
 - Files are processed in natural-numeric order (`1.md`, `2.md`, `10.md`)
 - Output folders mirror the input folder structure

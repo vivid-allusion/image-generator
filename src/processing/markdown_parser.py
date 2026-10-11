@@ -3,11 +3,15 @@ Markdown parsing utilities for extracting image URLs and prompts.
 
 This module provides functions to parse markdown files and extract:
 - Image URLs from any line (markdown ![alt](URL) or raw https:// URL)
-- Text prompt from line 1
+- Text prompt from the first non-empty line that is not a markdown image
 
 Format:
     Line 1: Text prompt
     Lines 2+: ![image](URL) or https://...  (multiple images supported)
+
+A leading line that is nothing but a markdown image — e.g. the previous
+generation embedded by tooling as a visual bookmark — is ignored; the prompt
+is then taken from the next non-empty text line.
 
 PRD Reference: Section 05.1, 06.2
 """
@@ -30,6 +34,10 @@ _URL_BODY = r"[^\s()]*(?:\([^\s()]*\)[^\s()]*)*"
 # Never encode these: % keeps already-encoded URLs stable, brackets are legal in a path.
 _URL_SAFE = ":/?#[]@!$&'()*+,;=%~"
 _IMG_URL_PATTERN = re.compile(rf"!\[.*?\]\((https?://{_URL_BODY})\)")
+# A whole line that is nothing but a markdown image embed, scheme-agnostic:
+# relative targets (../05.OUTPUT/…) count as images too. Used to ignore a
+# leading generated-image bookmark when looking for the prompt.
+_MD_IMAGE_LINE = re.compile(rf"!\[.*?\]\({_URL_BODY}\)")
 _LINK_WITHOUT_BANG = re.compile(r"(?<!!)\[.*?\]\((https?://[^\)]+)\)")
 _BANG_SPACE_PATTERN = re.compile(r"! +\[.*?\]\(.*?\)")
 _PAREN_SPACE_PATTERN = re.compile(r"!\[.*?\] +\(.*?\)")
@@ -137,6 +145,11 @@ def parse_markdown(
             continue
 
         if not seen_prompt:
+            if _MD_IMAGE_LINE.fullmatch(stripped):
+                # A leading markdown image (e.g. the previous generation
+                # embedded at the top of the file) is a bookmark, not the
+                # prompt — ignore it and keep looking.
+                continue
             prompt = stripped
             seen_prompt = True
             continue
@@ -156,7 +169,7 @@ def parse_markdown(
 
 
 def extract_prompt_text(markdown_content: str) -> str:
-    """Extract text prompt from first line of markdown."""
+    """Extract text prompt from the first non-image markdown line."""
     prompt, _ = parse_markdown(markdown_content)
     return prompt
 
