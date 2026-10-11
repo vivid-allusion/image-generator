@@ -28,7 +28,7 @@ from .exceptions import (
 from .processing.context import PipelineContext
 from .processing.first_run import handle_first_run
 from .processing.markdown_parser import read_markdown_files
-from .processing.payload import compose_run_payloads, embed_payloads
+from .processing.payload import compose_run_payloads, embed_payloads, stamp_saved_file
 from .processing.placeholders import write_placeholders
 from .processing.profiles import (
     load_profile_standalone,
@@ -93,7 +93,7 @@ def _report_results(results: list[Any], placeholders: int = 0) -> int:
 def _execute_pipeline(ctx: PipelineContext) -> int:
     """Run the core generation pipeline: build inputs → run → report → log."""
     inputs = build_inputs(ctx.md_files, ctx.platform, ctx.input_root, profile=ctx.profile)
-    results = _run_with_progress(ctx.engine, inputs)
+    results, stamped = _run_with_progress(ctx, inputs)
 
     payloads = compose_run_payloads(ctx, results)
     generated = success_paths(results)
@@ -106,7 +106,7 @@ def _execute_pipeline(ctx: PipelineContext) -> int:
     if ctx.logs:
         write_run_logs(generated + placeholders, ctx.output_dir, ctx, payloads, results)
     if ctx.save_payloads:
-        embed_payloads(results, payloads)
+        embed_payloads(results, payloads, skip=stamped)
     return exit_code
 
 
@@ -140,13 +140,21 @@ def _make_pipeline_context(
     )
 
 
-def _run_with_progress(engine: Any, inputs: list[Any]) -> list[Any]:
+def _run_with_progress(
+    ctx: PipelineContext, inputs: list[Any]
+) -> tuple[list[Any], set[str]]:
     """Run the engine under a live Progress display.
 
     The display swaps the engine's private ``_on_progress`` callback for the
     duration of the run (the de-facto Generator↔Engine progress contract) and
-    restores it afterwards.
+    restores it afterwards. Each save event also stamps that file's payload
+    before the engine reveals it under its final name; the returned
+    ``stamped`` set holds the stamped destinations so the end-of-run pass can
+    skip them.
     """
+    engine = ctx.engine
+    stamped: set[str] = set()
+
     from rich.progress import (
         BarColumn,
         Progress,
@@ -175,11 +183,13 @@ def _run_with_progress(engine: Any, inputs: list[Any]) -> list[Any]:
                 idx = min(done, len(inputs) - 1)
                 description = inputs[idx].path.name
             bar.update(task, description=description)
+            if getattr(msg, "saved_path", None) is not None:
+                stamp_saved_file(ctx, inputs, msg, stamped)
 
         original = engine._on_progress
         engine._on_progress = on_progress
         try:
-            return engine.run(inputs)
+            return engine.run(inputs), stamped
         finally:
             engine._on_progress = original
 

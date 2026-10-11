@@ -111,7 +111,9 @@ def test_execute_pipeline_passes_profile_to_build_inputs(monkeypatch, tmp_path):
         return []
 
     monkeypatch.setattr(main_simple, "build_inputs", recorder)
-    monkeypatch.setattr(main_simple, "_run_with_progress", lambda engine, inputs: [])
+    monkeypatch.setattr(
+        main_simple, "_run_with_progress", lambda ctx, inputs: ([], set())
+    )
     monkeypatch.setattr(main_simple, "compose_run_payloads", lambda ctx, results: {})
     monkeypatch.setattr(
         main_simple, "write_placeholders", lambda ctx, results, payloads=None: []

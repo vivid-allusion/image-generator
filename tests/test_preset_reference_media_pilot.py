@@ -100,7 +100,9 @@ def test_cross_repo_pilot_stub_engine_boundary(stub_engine, monkeypatch, tmp_pat
 
     captured: dict = {}
     monkeypatch.setattr(
-        main_simple, "_run_with_progress", lambda engine, inputs: engine.run(inputs)
+        main_simple,
+        "_run_with_progress",
+        lambda ctx, inputs: (ctx.engine.run(inputs), set()),
     )
     monkeypatch.setattr(
         main_simple,

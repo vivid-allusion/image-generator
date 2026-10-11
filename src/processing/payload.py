@@ -119,10 +119,19 @@ def compose_run_payloads(ctx: PipelineContext, results: list[Any]) -> dict[str, 
     return payloads
 
 
-def embed_payloads(results: list[Any], payloads: dict[str, str]) -> None:
-    """Embed each generated file's precomposed payload. Failures log and continue."""
+def embed_payloads(
+    results: list[Any], payloads: dict[str, str], skip: set[str] | None = None
+) -> None:
+    """Embed each generated file's precomposed payload. Failures log and continue.
+
+    ``skip`` holds destinations already stamped on their save event (see
+    ``stamp_saved_file``) — those are never re-injected, so a file moved out of
+    the output folder after it was stamped stays silent instead of erroring.
+    """
     for result in results:
         if getattr(result, "status", "") != "ok" or not getattr(result, "path", None):
+            continue
+        if skip and str(result.path) in skip:
             continue
         text = payloads.get(str(result.path))
         if text is None:
@@ -130,8 +139,49 @@ def embed_payloads(results: list[Any], payloads: dict[str, str]) -> None:
         try:
             inject_payload(result.path, text=text)
             logger.debug(f"Payload embedded: {result.path.name}")
+        except FileNotFoundError:
+            logger.warning(
+                f"Payload embed skipped for {result.path.name}: the file is no "
+                "longer in the output folder (moved or removed since it was written)"
+            )
         except Exception as exc:
             logger.error(f"Failed to embed payload in {result.path.name}: {exc}")
+
+
+def stamp_saved_file(
+    ctx: PipelineContext,
+    inputs: list[Any],
+    event: Any,
+    stamped: set[str],
+) -> None:
+    """Stamp the file from an engine save event, before its final name appears.
+
+    Engines stage each saved file under a hidden ``.<name>.part`` and emit the
+    save event with ``saved_path`` (the staged file) and ``final_path`` (the
+    destination); the engine renames only after this callback returns. Stamping
+    here guarantees the recipe is inside the file before the final name — or
+    the file itself — can be seen or moved. Best effort: any failure is left
+    for the end-of-run pass, so an event can never abort a batch.
+    """
+    if not ctx.save_payloads:
+        return
+    saved = getattr(event, "saved_path", None)
+    if saved is None:
+        return
+    final = Path(getattr(event, "final_path", None) or saved)
+    current = int(getattr(event, "current", 0) or 0)
+    if not 1 <= current <= len(inputs):
+        return
+    md_file = index_md_files(ctx.md_files).get(str(inputs[current - 1].path))
+    if md_file is None:
+        return
+    text = json.dumps(compose_payload(ctx, md_file, final), indent=2, ensure_ascii=False)
+    try:
+        inject_payload(Path(saved), text=text)
+    except Exception as exc:
+        logger.debug(f"Payload stamp deferred for {final.name}: {exc}")
+        return
+    stamped.add(str(final))
 
 
 def inject_payload(
