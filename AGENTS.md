@@ -1,3 +1,8 @@
+## Instruction Precedence
+
+- A direct instruction from the Owner in the current conversation overrides any rule in this file.
+- When such an instruction conflicts with a rule here, edit this file to resolve the conflict, then carry out the instruction.
+
 ## Agent Behaviour Rules
 
 ### General Behavior
@@ -18,14 +23,15 @@
 
 ## USER-FILES Protection Rules
 
-### ABSOLUTE FORBIDDEN - USER-FILES/04.INPUT/
-- MUST NEVER: Create, delete, modify, move, or rename ANY files in USER-FILES/04.INPUT/
-- CAN ONLY: Read files from USER-FILES/04.INPUT/
+### USER-FILES/04.INPUT/ Rules
+- MUST NEVER (unless the Owner explicitly instructs that specific edit — see Instruction Precedence): edit, overwrite or delete the CONTENT of a file in USER-FILES/04.INPUT/
+- MAY: move a file out of USER-FILES/04.INPUT/ (e.g. into USER-FILES/07.TEMP/) when the Owner explicitly instructs it
+- CAN: read files from USER-FILES/04.INPUT/
 
 ### General USER-FILES Rules
 - MUST: Never create, delete, modify, move, or rename files in USER-FILES/ without explicit permission
 - MUST: Ask before any operation in USER-FILES/
-- SHOULD: Only read from USER-FILES/04.INPUT/ and write to USER-FILES/05.OUTPUT/
+- SHOULD: Read inputs from USER-FILES/04.INPUT/ and write outputs to USER-FILES/05.OUTPUT/
 - SHOULD NOT: Implement any auto-cleanup or archiving features
 
 ## Project Structure Rules

@@ -166,6 +166,41 @@ After renaming (see Gotchas) the same file is `…-0.svg`.
   rsvg-convert -w 256 -h 256 <file.svg> -o /tmp/preview.png
   ```
 
+### v2 — the torn chain link (second pass; supersedes v1)
+
+**v1 was rejected by the Owner.** The 2026-10-12 v1 result
+(`broken-link-red.svg`) came back as *"just a broken circle"* — two curved
+halves with a slash-like gap. It read as a broken ring, not a chain link. The
+Owner's reference was the classic **unlink** glyph: two rounded link halves
+pulled apart on a diagonal, a **jagged/zigzag break** at the midpoint where they
+tore, and small **straight impact dashes radiating** around the break. A cold LLM
+must **not** repeat the v1 phrasing ("a broken chain link" alone) — it steers
+Recraft toward a circle.
+
+**Winning prompt (verbatim — `USER-FILES/04.INPUT/demo-broken-link-v2-1.md`):**
+
+```markdown
+A bold flat vector icon of a broken chain link: two rounded-rectangle link halves torn apart along a diagonal, the two ends separated by a jagged zigzag break at the centre, small straight impact dashes radiating outward around the break point, solid red (#e5484d), thick uniform strokes, minimal geometric style, centered on a plain background, no text, no shadows, no gradients — an editor gutter warning symbol, square canvas.
+```
+
+- **Profile:** the verbatim profile above **plus** the `colors:
+  [{r: 229, g: 72, b: 77}]` block (pins the glyph to `#e5484d` exactly).
+- **Command:** `python3 run.py --verbose` (two files per batch, $0.16/batch).
+- **Winner:** `docs/ui-assets/examples/broken-link-red-v2.svg` (== `…-v2-a.svg`)
+  — the jagged tear as described. Shape language that worked: **"two
+  rounded-rectangle link halves"**, **"torn apart along a diagonal"**,
+  **"jagged zigzag break at the centre"**, **"straight impact dashes radiating"**.
+- **Alternate:** `docs/ui-assets/examples/broken-link-red-v2-b.svg` — the same
+  idea but the halves pulled fully apart with a clean gap (no zigzag); the
+  cleanest silhouette at 16 px.
+- **What did not work:** *"two interlocking oval chain links snapped apart"*
+  (v2-2) returned a link with a **diagonal slash** through it — reads as a slash,
+  not a tear. *"interlocking oval links … zigzag crack"* (v2-3) read as one busy
+  looping shape. The interlocked full-link framing is the trap; the **two
+  separated rounded-rectangle halves** framing is what produces the torn-link
+  look.
+- **Spend:** v2 spent **$0.32** (4 generations at $0.08).
+
 ## Gotchas / troubleshooting
 
 - **The SVG is saved as `.png`.** The Recraft endpoint returns a URL ending in
