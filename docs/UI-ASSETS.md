@@ -246,3 +246,13 @@ this icon lands with that item. Do not copy a generated SVG straight into
   read-only rule).
 - Generated assets land via workstreams + the design gate (above) — never
   straight into the product repo.
+
+### The chosen icon + the transparent background (2026-10-12)
+
+The Owner picked **v2-b** and asked for a transparent background. Recraft SVGs
+carry a full-canvas background **path** (here `fill="rgb(248,247,245)"`,
+`d="M 0 0 L 2048 0 L 2048 2048 L 0 2048 L 0 0 z"`) plus a `c2pa` provenance
+manifest in `<metadata>` (keep the manifest). Strip ONLY that one path element
+(exact-match on the cream fill) — the artwork is untouched and the file then
+renders with a transparent corner. `broken-link-red-v2.svg` = the chosen icon
+(transparent); `-a`/`-b` kept as history.
