@@ -256,3 +256,20 @@ manifest in `<metadata>` (keep the manifest). Strip ONLY that one path element
 (exact-match on the cream fill) — the artwork is untouched and the file then
 renders with a transparent corner. `broken-link-red-v2.svg` = the chosen icon
 (transparent); `-a`/`-b` kept as history.
+
+### A second verified pattern — line-art (the app's activity-bar style)
+
+For **activity-bar / sidebar icons** the working pattern is **line-art**, not
+the solid glyph: uniform outline strokes, dark charcoal, no filled shapes. This
+prompt produced a clean gear on the first try (the CEO-office session, m70q,
+2026-10-12; same profile; $0.08):
+
+> A single minimal line-art icon of a gear (settings), in the style of the
+> activity-bar icons in a code editor like VS Code or Theia — outline strokes
+> only, uniform medium weight, dark charcoal (#111215), eight teeth, a simple
+> round hole in the center, geometric and symmetrical, flat 2D vector, centered
+> on a plain white square with generous even margins, no text, no letters, no
+> numbers, no shadow, no gradient, no filled shapes
+
+(Solid glyph = the gutter marks; line-art charcoal = the activity bar. Pick the
+style by where the icon lives.)
