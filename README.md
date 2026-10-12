@@ -103,6 +103,14 @@ USER-FILES/05.OUTPUT/YYMMDD_HHMMSS_IMG/
 - Failed generations (in a mixed run) get red error-placeholder images so the output serial stays intact
 - All-failed runs exit 1 with a fallback `image_generator_<ts>.log`
 
+## UI assets (square SVG icons)
+
+For UI assets — square SVG icons/graphics for the Helmer UI — see
+[`docs/UI-ASSETS.md`](docs/UI-ASSETS.md). It is the cold-LLM playbook: the
+Recraft text-to-vector profile, the prompt recipe, the exact commands, costs,
+and the gotchas. A worked example lives at
+[`docs/ui-assets/examples/broken-link-red.svg`](docs/ui-assets/examples/broken-link-red.svg).
+
 ## Authentication
 
 Four-tier resolution per platform (`REPLICATE_API_TOKEN`, `FAL_KEY`, `OPENROUTER_API_KEY`, `GOOGLE_API_KEY`):
