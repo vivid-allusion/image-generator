@@ -151,6 +151,7 @@ PRE_W22_KEYS = {
     "reference_urls",
     "input_file",
     "media_type",
+    "video_duration",
     "output_file",
 }
 

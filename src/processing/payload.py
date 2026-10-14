@@ -74,6 +74,9 @@ def compose_payload(
         "reference_urls": list(md_file["reference_urls"]),
         "input_file": relative_posix(md_file["path"], ctx.input_root) or md_file["path"].name,
         "media_type": str(ctx.profile.get("media_type") or "image"),
+        # The key is always present; images carry the empty string (the
+        # Owner's "empty value"). Video Generator fills the real duration.
+        "video_duration": "",
         "output_file": out_path.name,
     }
     if preset_refs:

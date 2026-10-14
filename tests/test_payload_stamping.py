@@ -1,6 +1,7 @@
 """Tests for per-file payload stamping on engine save events."""
 
 import io
+import json
 import sys
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
@@ -11,7 +12,7 @@ from PIL import Image
 
 from src.main_simple import _execute_pipeline
 from src.processing.context import PipelineContext
-from src.processing.payload import read_payload
+from src.processing.payload import compose_payload, inject_payload, read_payload
 
 
 class _StagingStubEngine:
@@ -112,6 +113,36 @@ def test_stamp_lands_on_the_save_event(monkeypatch: pytest.MonkeyPatch, tmp_path
     assert payload is not None
     assert payload["output_file"] == "0-a.png"
     assert payload["prompt"]["raw"] == "a castle"
+    assert payload["media_type"] == "image"
+    assert payload["video_duration"] == ""
+
+
+@pytest.mark.parametrize(
+    ("fmt", "suffix"),
+    [("PNG", ".png"), ("JPEG", ".jpg"), ("WEBP", ".webp")],
+)
+def test_video_duration_round_trips_in_every_container(
+    tmp_path: Path, fmt: str, suffix: str
+):
+    """The empty key survives the PNG/iTXt, JPEG/APP1 and WebP/XMP writers."""
+    ctx = PipelineContext(
+        md_files=[],
+        engine=SimpleNamespace(PROVIDER_NAME="Stub"),
+        platform="replicate",
+        profile=_profile(),
+        output_dir=tmp_path,
+        input_root=Path("in"),
+    )
+    target = tmp_path / f"recipe{suffix}"
+    Image.new("RGB", (32, 32), (0, 0, 255)).save(target, format=fmt)
+    text = json.dumps(compose_payload(ctx, _md("in/a.md", "a castle"), target), indent=2)
+
+    inject_payload(target, text=text)
+
+    payload = read_payload(target)
+    assert payload is not None
+    assert payload["media_type"] == "image"
+    assert payload["video_duration"] == ""
 
 
 def test_moved_file_is_already_stamped_and_stays_silent(
