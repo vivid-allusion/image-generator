@@ -145,7 +145,7 @@ main() → _run_studiolot()
 | `src/constants.py` | Shared constants (`__version__`, `TIMESTAMP_FORMAT`, `DEFAULT_PLATFORM`) |
 | `src/datatypes.py` | `MarkdownFile` TypedDict — core data structure |
 | `src/utils/path_resolver.py` | Input/output path resolution with USER-FILES defaults |
-| `src/utils/logging.py` | loguru console configuration + complete-run capture: `_TerminalCleaner` (ANSI strip + CR collapse), `start_output_capture()`, `captured_output()`, `write_run_logs()` (header + payload + capture + summary per-file logs) |
+| `src/utils/logging.py` | loguru console configuration + complete-run capture: `_TerminalCleaner` (ANSI strip + CR collapse), `start_output_capture()`, `captured_output()`, `write_run_logs()` (header + payload + capture + summary per-file logs), `write_run_error_log()` (always-on run-level `<YYMMDD_HHMMSS>_ERROR.log` when a run ends with failures or the engine raises) |
 
 ---
 

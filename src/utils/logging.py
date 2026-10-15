@@ -4,6 +4,10 @@ Capture reduces raw terminal output to plain text (ANSI sequences stripped,
 CR redraws collapsed) so every generated file can ship a readable,
 LLM-friendly log beside it: `<generated-file-stem>.log`.
 
+The run-level `<YYMMDD_HHMMSS>_ERROR.log` (`write_run_error_log`) is the
+exception: it is always written when a run ends with failed items or the
+engine raises — it is not gated by the opt-in run-log flag.
+
 Output-channel policy: loguru carries leveled diagnostics; direct stderr
 writes are reserved for always-visible critical lines (run summary,
 discovery notices). Progress events flow through the engine callback.
@@ -178,6 +182,49 @@ def write_run_logs(
         log_path.write_text(_log_text(header, None, capture, summary))
         written.append(log_path)
     return written
+
+
+def write_run_error_log(
+    ctx: PipelineContext,
+    results: list[Any],
+    traceback_text: str | None = None,
+) -> Path | None:
+    """Write the always-on run-level ``<YYMMDD_HHMMSS>_ERROR.log``.
+
+    Used when a run ends with at least one failed item, or when the engine
+    raised (``traceback_text`` carries the uncaught exception's full
+    traceback) — independent of the opt-in run-log flag. Returns the written
+    path, or None when the write itself failed (logged, never raised).
+    """
+    ts = datetime.now().strftime(TIMESTAMP_FORMAT)
+    path = ctx.output_dir / f"{ts}_ERROR.log"
+    ok = sum(1 for r in results if is_success(r))
+    failed = sum(1 for r in results if getattr(r, "status", "") == "error")
+    names = {str(b["path"]): b["path"].name for b in ctx.md_files}
+    lines = [
+        "=== Image Generator run failure log ===",
+        f"tool: image-generator v{__version__}",
+        f"run_mode: {ctx.run_mode}",
+        f"profile: {ctx.profile.get('profile_path') or 'unknown'}",
+        f"input_root: {str(ctx.input_root) if ctx.input_root else None}",
+        f"counts: ok={ok} failed={failed}",
+    ]
+    for r in results:
+        if getattr(r, "status", "") != "error":
+            continue
+        source = names.get(str(r.source_path), str(r.source_path))
+        summary = error_info(getattr(r, "error_msg", "") or "").get("message", "")
+        log_ref = (getattr(r, "metadata", None) or {}).get("error_log", "n/a")
+        lines.append(f"failed: {source} | error: {summary} | error_log: {log_ref}")
+    if traceback_text:
+        lines += ["traceback:", traceback_text.rstrip("\n")]
+    try:
+        ctx.output_dir.mkdir(parents=True, exist_ok=True)
+        path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    except OSError as exc:
+        logger.error(f"Could not write the run-level error log: {exc}")
+        return None
+    return path
 
 
 def _log_text(header: str, payload_text: str | None, capture: str, summary: str) -> str:

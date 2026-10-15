@@ -6,6 +6,7 @@ The Generator reads markdowns, loads an Engine, and calls engine.run().
 
 import os
 import sys
+import traceback
 from pathlib import Path
 from typing import Any
 
@@ -35,7 +36,12 @@ from .processing.profiles import (
     load_profile_studiolot,
 )
 from .processing.results import success_paths
-from .utils.logging import setup_logging, start_output_capture, write_run_logs
+from .utils.logging import (
+    setup_logging,
+    start_output_capture,
+    write_run_error_log,
+    write_run_logs,
+)
 from .utils.path_resolver import (
     create_timestamped_output_path,
     resolve_input_path,
@@ -91,9 +97,20 @@ def _report_results(results: list[Any], placeholders: int = 0) -> int:
 
 
 def _execute_pipeline(ctx: PipelineContext) -> int:
-    """Run the core generation pipeline: build inputs → run → report → log."""
+    """Run the core generation pipeline: build inputs → run → report → log.
+
+    The run-level ``_ERROR.log`` is always written when the engine run ends
+    with failed items or raises (the raise is re-raised after the log) —
+    unlike `ctx.logs`, it is never opt-in.
+    """
     inputs = build_inputs(ctx.md_files, ctx.platform, ctx.input_root, profile=ctx.profile)
-    results, stamped = _run_with_progress(ctx, inputs)
+    try:
+        results, stamped = _run_with_progress(ctx, inputs)
+    except Exception:
+        write_run_error_log(ctx, [], traceback_text=traceback.format_exc())
+        raise
+    if any(getattr(r, "status", "") == "error" for r in results):
+        write_run_error_log(ctx, results)
 
     payloads = compose_run_payloads(ctx, results)
     generated = success_paths(results)

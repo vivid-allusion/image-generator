@@ -138,6 +138,7 @@ class StubEngine:
                             "Prediction failed (E005) " "https://replicate.com/p/abc12345xyz"
                         ),
                         expected_path=out,
+                        metadata={"error_log": str(self.output_dir / f"{index}-{stem}_ERROR.log")},
                     )
                 )
             else:
@@ -194,7 +195,11 @@ def _run_pipeline(
     )
     exit_code = _execute_pipeline(ctx)
     assert exit_code == 1
-    return {p.name: p.read_text() for p in tmp_path.glob("*.log")}
+    # Per-file run logs only — the always-on run-level _ERROR.log is asserted
+    # separately (TestRunErrorLog) so the per-file assertions stay focused.
+    return {
+        p.name: p.read_text() for p in tmp_path.glob("*.log") if not p.name.endswith("_ERROR.log")
+    }
 
 
 def _payload_section(text: str) -> str:
@@ -329,7 +334,9 @@ def test_default_run_writes_no_log(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
     logs = _run_pipeline(monkeypatch, tmp_path, logs=False)
 
     assert logs == {}
-    assert list(tmp_path.glob("*.log")) == []
+    assert [p.name for p in tmp_path.glob("*.log") if not p.name.endswith("_ERROR.log")] == []
+    # The run had a failed item, so the always-on run-level ERROR log exists.
+    assert len(list(tmp_path.glob("*_ERROR.log"))) == 1
     assert (tmp_path / "0-a.png").exists()
 
 
@@ -384,3 +391,91 @@ def test_make_pipeline_context_resolves_logs(tmp_path: Path):
 
     assert _ctx("standalone").logs is True
     assert _ctx("studiolot").logs is False
+
+
+class TestRunErrorLog:
+    """The run-level ``<YYMMDD_HHMMSS>_ERROR.log`` — always on after failures.
+
+    Unlike the opt-in per-file run logs, this summary is written whenever a
+    run ends with at least one failed item, or when the engine raises.
+    """
+
+    def test_failed_run_writes_run_error_log(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+        _run_pipeline(monkeypatch, tmp_path)
+
+        run_logs = list(tmp_path.glob("*_ERROR.log"))
+        assert len(run_logs) == 1
+        text = run_logs[0].read_text()
+        assert "=== Image Generator run failure log ===" in text
+        assert "tool: image-generator v" in text
+        assert "run_mode: studiolot" in text
+        assert "profile: /profiles/test.yaml" in text
+        assert "input_root: in" in text
+        assert "counts: ok=1 failed=1" in text
+        assert "failed: b.md" in text
+        assert f"error_log: {tmp_path / '1-b_ERROR.log'}" in text
+        assert "traceback:" not in text
+
+    def test_run_error_log_written_without_logs_flag(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ):
+        logs = _run_pipeline(monkeypatch, tmp_path, logs=False)
+
+        assert logs == {}
+        run_logs = list(tmp_path.glob("*_ERROR.log"))
+        assert len(run_logs) == 1
+        assert "failed: b.md" in run_logs[0].read_text()
+
+    def test_successful_run_writes_no_run_error_log(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ):
+        _install_stub_engine_module(monkeypatch)
+        ctx = PipelineContext(
+            md_files=[_md("in/a.md", "a castle")],
+            engine=StubEngine(tmp_path),
+            platform="replicate",
+            profile=_profile(),
+            output_dir=tmp_path,
+            input_root=Path("in"),
+            save_payloads=False,
+            logs=False,
+            run_mode="studiolot",
+            cli_args={},
+        )
+
+        assert _execute_pipeline(ctx) == 0
+        assert list(tmp_path.glob("*_ERROR.log")) == []
+
+    def test_engine_exception_writes_run_error_log_and_reraises(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ):
+        class ExplodingEngine:
+            PROVIDER_NAME = "Boom"
+            _on_progress = None
+
+            def run(self, inputs: list) -> list:
+                raise RuntimeError("provider exploded")
+
+        _install_stub_engine_module(monkeypatch)
+        ctx = PipelineContext(
+            md_files=[_md("in/a.md", "a castle")],
+            engine=ExplodingEngine(),
+            platform="replicate",
+            profile=_profile(),
+            output_dir=tmp_path,
+            input_root=Path("in"),
+            save_payloads=False,
+            logs=False,
+            run_mode="studiolot",
+            cli_args={},
+        )
+
+        with pytest.raises(RuntimeError, match="provider exploded"):
+            _execute_pipeline(ctx)
+
+        run_logs = list(tmp_path.glob("*_ERROR.log"))
+        assert len(run_logs) == 1
+        text = run_logs[0].read_text()
+        assert "counts: ok=0 failed=0" in text
+        assert "traceback:" in text
+        assert "RuntimeError: provider exploded" in text

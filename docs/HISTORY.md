@@ -10,6 +10,12 @@
 
 ## Session History
 
+### 2026-10-15 — Always-on failure logs: per-item `_ERROR.log` + run-level summary
+- New error-log convention with the sibling tools: on ANY generation failure the Engine (engine-fal) writes a verbose `<base>-<idx>_ERROR.log` beside the media's would-be destination — provider exceptions, empty-prompt skips, "no output returned", and save/download/`.part`-reveal failures — regardless of logging flags, and records its path on the error result as `metadata["error_log"]`.
+- The Vehicle adds `src/utils/logging.py::write_run_error_log()`: `<output_dir>/<YYMMDD_HHMMSS>_ERROR.log` listing tool + version, run mode, profile path, input root, ok/failed counts, one `failed:` line per item (source name, error summary, the item's `_ERROR.log` path) — and, when the engine run raises, `_execute_pipeline` writes it with the full traceback before re-raising. Never for parse/preflight rejections, and never gated by `-l/--logs`.
+- Tests: engine +12 failure-path tests (113 total; log existence/naming/metadata, traceback + payload content, `.part`-reveal failure, destination subdirs, key masking); IG +4 (121 passed / 2 skipped; run-level content, logs-flag independence, no-failure and engine-exception paths).
+- Note: `tests/test_logging.py::_run_pipeline` now returns per-file run logs only (filters `*_ERROR.log`); `test_default_run_writes_no_log` asserts the always-on `_ERROR.log` beside the absence of opt-in logs.
+
 ### 2026-10-06 — W32 phase_2 (M2) + plan complete: IG logging tests; W32 retired
 - New tests in `tests/test_logging.py`: `test_default_run_writes_no_log` (logs=False → no `.log`, media still written), `test_logs_flag_writes_log` (`0-a.log`/`1-b.log`), `TestLogsFlag` (`parse_args` defaults off; `-l`/`--logs` both set it; `_logs_enabled` table is standalone-only), and `test_make_pipeline_context_resolves_logs`.
 - Extended, not replaced: every pre-existing log-content assertion retained. Verifier APPROVE; gate 107 passed / 1 skipped / 0 failures, ruff clean.
