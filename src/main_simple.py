@@ -36,6 +36,7 @@ from .processing.profiles import (
     inherit_prompt_enabled,
     load_profile_standalone,
     load_profile_studiolot,
+    profile_has_prompt_text,
 )
 from .processing.results import success_paths
 from .utils.logging import (
@@ -303,7 +304,7 @@ def _run_studiolot(args) -> int:
 
     input_dir = Path(args.input_dir) if args.input_dir else Path(".")
 
-    md_files = read_markdown_files(input_dir)
+    md_files = read_markdown_files(input_dir, allow_empty_prompt=profile_has_prompt_text(profile))
     if not md_files:
         raise FileNotFoundError(f"No .md files found in {input_dir}")
     _handle_preflight_checks(args, md_files, profile)
@@ -355,7 +356,7 @@ def _run_standalone(args) -> int:
     # ── check inputs before creating output dir ──────────────────────────────
 
     input_path = resolve_input_path(profile)
-    md_files = read_markdown_files(input_path)
+    md_files = read_markdown_files(input_path, allow_empty_prompt=profile_has_prompt_text(profile))
     _handle_preflight_checks(args, md_files, profile)
 
     if not md_files:

@@ -14,7 +14,7 @@ from src.processing.context import PipelineContext
 from src.processing.inherit import resolve_inherited_prompts
 from src.processing.payload import compose_payload
 from src.processing.payload_containers import inject_jpeg
-from src.processing.profiles import inherit_prompt_enabled
+from src.processing.profiles import inherit_prompt_enabled, profile_has_prompt_text
 
 FIRST = "https://b2/first.png"
 SECOND = "https://b2/second.png"
@@ -92,6 +92,13 @@ def test_inherit_prompt_enabled_validates_the_profile_key():
         inherit_prompt_enabled({"inherit_prompt": "yes"})
     with pytest.raises(ConfigurationError):
         inherit_prompt_enabled({"inherit_prompt": 1})
+
+
+def test_profile_has_prompt_text():
+    assert profile_has_prompt_text({}) is False
+    assert profile_has_prompt_text({"prompt_prefix": "  "}) is False
+    assert profile_has_prompt_text({"prompt_prefix": "Upscale this"}) is True
+    assert profile_has_prompt_text({"prompt_suffix": "in 4K"}) is True
 
 
 # ── resolution ───────────────────────────────────────────────────────────────

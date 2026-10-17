@@ -1,10 +1,13 @@
 """Tests for markdown_parser module."""
 
-import pytest
+import io
+
+from loguru import logger
 
 from src.processing.markdown_parser import (
     extract_all_image_urls,
     extract_prompt_text,
+    parse_markdown,
     read_markdown_files,
     validate_image_urls,
 )
@@ -19,13 +22,84 @@ class TestExtractPromptText:
         content = "\n\nHello world\n![img](https://x.com/a.jpg)"
         assert extract_prompt_text(content) == "Hello world"
 
-    def test_empty_content_raises(self):
-        with pytest.raises(ValueError, match="No prompt"):
-            extract_prompt_text("")
+    def test_empty_content_returns_empty_prompt(self):
+        assert extract_prompt_text("") == ""
 
-    def test_whitespace_only_raises(self):
-        with pytest.raises(ValueError):
-            extract_prompt_text("   \n   \n")
+    def test_whitespace_only_returns_empty_prompt(self):
+        assert extract_prompt_text("   \n   \n") == ""
+
+
+class TestPromptFence:
+    """A ```prompt / ``` block is the prompt; its contents may be empty."""
+
+    def test_fenced_prompt_single_line(self):
+        content = "```prompt\nA man carries bags.\n```\n![ref](https://host/ref.jpg)"
+        assert extract_prompt_text(content) == "A man carries bags."
+        assert extract_all_image_urls(content) == ["https://host/ref.jpg"]
+
+    def test_fence_without_the_word_prompt(self):
+        content = "```\nA man carries bags.\n```\n![ref](https://host/ref.jpg)"
+        assert extract_prompt_text(content) == "A man carries bags."
+        assert extract_all_image_urls(content) == ["https://host/ref.jpg"]
+
+    def test_fenced_prompt_multiple_lines(self):
+        content = "```prompt\nLine one\n\nLine two\n```"
+        assert extract_prompt_text(content) == "Line one\n\nLine two"
+
+    def test_empty_fence_keeps_references(self):
+        content = "```prompt\n```\n\n![ref](https://host/1k.png)\n![ref2](https://host/other.png)"
+        assert extract_prompt_text(content) == ""
+        assert extract_all_image_urls(content) == [
+            "https://host/1k.png",
+            "https://host/other.png",
+        ]
+
+    def test_empty_bare_fence(self):
+        content = "```\n```\n![ref](https://host/1k.png)"
+        assert extract_prompt_text(content) == ""
+        assert extract_all_image_urls(content) == ["https://host/1k.png"]
+
+    def test_fence_after_a_bookmark_render(self):
+        content = (
+            "![render](https://host/prev.png)\n"
+            "```prompt\nA prompt\n```\n"
+            "![ref](https://host/ref.jpg)"
+        )
+        assert extract_prompt_text(content) == "A prompt"
+        assert extract_all_image_urls(content) == ["https://host/ref.jpg"]
+
+    def test_unclosed_fence_is_warned_and_ignored(self):
+        content = "```prompt\nA prompt\n![ref](https://host/ref.jpg)"
+        warnings: list[str] = []
+        prompt, urls = parse_markdown(content, warn=warnings.append)
+        assert prompt == "A prompt"
+        assert urls == ["https://host/ref.jpg"]
+        assert any("unclosed" in w for w in warnings)
+
+    def test_unclosed_fence_with_only_a_reference(self):
+        content = "```prompt\n![ref](https://host/ref.jpg)"
+        warnings: list[str] = []
+        prompt, urls = parse_markdown(content, warn=warnings.append)
+        assert prompt == ""
+        assert urls == ["https://host/ref.jpg"]
+        assert any("unclosed" in w for w in warnings)
+
+
+class TestEmptyPromptFiles:
+    """No text anywhere: empty prompt, every image embed is a reference."""
+
+    def test_empty_line_then_reference(self):
+        content = "\n![ref](https://host/1k.png)"
+        assert extract_prompt_text(content) == ""
+        assert extract_all_image_urls(content) == ["https://host/1k.png"]
+
+    def test_only_references(self):
+        content = "![a](https://host/a.png)\n![b](https://host/b.png)"
+        assert extract_prompt_text(content) == ""
+        assert extract_all_image_urls(content) == ["https://host/a.png", "https://host/b.png"]
+
+    def test_whitespace_only_file_collects_nothing(self):
+        assert extract_all_image_urls("   \n   \n") == []
 
 
 class TestExtractAllImageUrls:
@@ -136,9 +210,10 @@ class TestLeadingImageBookmarkIgnored:
             == "Make a poster with ![logo](https://host/logo.png) in the corner"
         )
 
-    def test_only_an_image_raises_no_prompt(self):
-        with pytest.raises(ValueError, match="No prompt"):
-            extract_prompt_text("![generated](../out/img.png)")
+    def test_only_an_image_returns_empty_prompt_and_is_a_reference(self):
+        content = "![generated](https://host/img.png)"
+        assert extract_prompt_text(content) == ""
+        assert extract_all_image_urls(content) == ["https://host/img.png"]
 
 
 class TestValidateImageUrls:
@@ -230,3 +305,51 @@ class TestReadMarkdownFilesValidation:
         files = read_markdown_files(tmp_path)
         assert len(files) == 1
         assert files[0]["reference_urls"] == ["https://ok.example/1.jpg"]
+
+
+class TestReadMarkdownFilesEmptyPrompt:
+    """Empty prompts: rejected by default, admitted when the profile carries text."""
+
+    def test_empty_prompt_rejected_without_a_profile_prefix(self, tmp_path):
+        (tmp_path / "up.md").write_text(
+            "```prompt\n```\n![ref](https://ok.example/1.jpg)\n", encoding="utf-8"
+        )
+        sink = io.StringIO()
+        sink_id = logger.add(sink, level="ERROR")
+        try:
+            assert read_markdown_files(tmp_path) == []
+        finally:
+            logger.remove(sink_id)
+        assert "Rejected up.md" in sink.getvalue()
+
+    def test_empty_prompt_admitted_with_the_flag_and_refs_kept(self, tmp_path, monkeypatch):
+        (tmp_path / "up.md").write_text(
+            "```prompt\n```\n![ref](https://ok.example/1.jpg)\n", encoding="utf-8"
+        )
+        monkeypatch.setattr(
+            "src.processing.markdown_parser.validate_image_urls",
+            lambda urls, timeout=5.0, workers=8: (list(urls), []),
+        )
+        files = read_markdown_files(tmp_path, allow_empty_prompt=True)
+        assert len(files) == 1
+        assert files[0]["prompt"] == ""
+        assert files[0]["reference_urls"] == ["https://ok.example/1.jpg"]
+
+    def test_ref_only_file_keeps_its_reference(self, tmp_path, monkeypatch):
+        (tmp_path / "only-ref.md").write_text(
+            "![ref](https://ok.example/1.jpg)\n", encoding="utf-8"
+        )
+        monkeypatch.setattr(
+            "src.processing.markdown_parser.validate_image_urls",
+            lambda urls, timeout=5.0, workers=8: (list(urls), []),
+        )
+        files = read_markdown_files(tmp_path, allow_empty_prompt=True)
+        assert len(files) == 1
+        assert files[0]["prompt"] == ""
+        assert files[0]["reference_urls"] == ["https://ok.example/1.jpg"]
+
+    def test_ref_only_file_rejected_without_the_flag(self, tmp_path):
+        (tmp_path / "only-ref.md").write_text(
+            "![ref](https://ok.example/1.jpg)\n", encoding="utf-8"
+        )
+        assert read_markdown_files(tmp_path) == []

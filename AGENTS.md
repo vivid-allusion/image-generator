@@ -131,7 +131,7 @@ main() → _run_studiolot()
 | `src/engine_loader.py` | Vendored snapshot of studiolot's `pipeline/engine_loader.py` (canonical) — `load_engine(ctx)` + `EngineLoadContext` + `copy_standby_profiles()` |
 | `src/engine_helpers.py` | Engine discovery, installation, input construction (`build_inputs()` passes `relative_dir` metadata, `_relative_dir()`), loading, `print_engine_not_found()` (lists all platforms) |
 | `src/engine_contract.py` | `EngineInputFile` protocol — shared contract for Engine.InputFile (requires `path`, `prompt`, `reference_urls`, `metadata`) |
-| `src/processing/markdown_parser.py` | `parse_markdown()`, `extract_prompt_text()`, `extract_all_image_urls()`, `read_markdown_files()` — prompted + URL parsing + directory batch reader |
+| `src/processing/markdown_parser.py` | `parse_markdown()` (prompt as a single text line or a fenced prompt block; empty prompts allowed), `extract_prompt_text()`, `extract_all_image_urls()`, `read_markdown_files(allow_empty_prompt=…)` — prompted + URL parsing + directory batch reader |
 | `src/processing/first_run.py` | `handle_first_run()` — engine check, wizard launch, STANDBY seeding; extracted from `_run_standalone()` |
 | `src/processing/inherit.py` | Payload inheritance: `resolve_inherited_prompts()` + `fetch_image()` — reads the first reference image's recipe back as the prompt of record; best-effort, warns and falls back |
 | `src/processing/profiles.py` | Profile loading (standalone + studiolot) via `_parse_profile_yaml()`, empty-STANDBY guidance, `inherit_prompt_enabled()` guard |
@@ -154,6 +154,7 @@ main() → _run_studiolot()
 
 - Profiles: YAML files in `USER-FILES/03.PROFILES/` (production) or `USER-FILES/02.STANDBY/` (engine-seeded backup)
 - Profile format: `platform`, `parameters`, `prompt_prefix`, `prompt_suffix`, `pricing`, `paths`, `delay_between_requests`
+- `prompt_prefix`/`prompt_suffix` wrap each prompt; when either is non-empty the profile also admits Markdown files with an empty prompt — the prefix/suffix then forms the request.
 - Profile format may include an optional top-level `reference_images` list (URLs); they are appended after each Markdown file’s own `reference_urls`.
 - Profile format may include an optional top-level `inherit_prompt` boolean (default `false`): with it on, a run's *first* `reference_urls` image is fetched and its embedded recipe (if any) becomes the new file's prompt of record — text, prefix and suffix — while this run's endpoint/parameters/timestamps stay truthful, the run's own wording is kept under `instruction`, and the source is recorded under `inherited_from`. A reference without a recipe warns and falls back to the run's own prompt. CLI override: `--inherit-prompt` / `--no-inherit-prompt`.
 - Standby profiles are engine-owned: `02.STANDBY/` is seeded by `copy_standby_profiles()` after engine install. Starts empty (`.gitkeep` only). Content is gitignored — only `.gitkeep` is tracked.

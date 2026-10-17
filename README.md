@@ -86,8 +86,10 @@ A cinematic portrait in soft lighting
 ![reference](https://example.com/side-view.jpg)
 ```
 
-- Line 1: text prompt (a leading line that is only a markdown image, e.g. a previous generation kept as a bookmark, is ignored — the prompt is the first non-image text line)
+- Line 1: the prompt — a single text line, or a fenced block opened with ```` ```prompt ```` (a bare ```` ``` ```` works too); the block's contents may be empty
+- A leading line that is only a markdown image (e.g. a previous generation kept as a bookmark) is ignored — the prompt is the first non-image text line, or the fenced block
 - Following lines: markdown image URLs or raw `https://` URLs (text-to-image works with no URLs)
+- A file with no prompt text at all (an empty fence, or image embeds only) is accepted only when the profile carries a `prompt_prefix`/`prompt_suffix` — those then form the request; otherwise the file is rejected, never sent as an empty prompt
 - Files are processed in natural-numeric order (`1.md`, `2.md`, `10.md`)
 - Output folders mirror the input folder structure
 

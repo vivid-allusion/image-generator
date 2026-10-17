@@ -51,6 +51,17 @@ def inherit_prompt_enabled(profile: dict[str, Any]) -> bool:
     return value
 
 
+def profile_has_prompt_text(profile: dict[str, Any]) -> bool:
+    """True when the profile's prefix or suffix supplies prompt text.
+
+    Such a profile admits Markdown files with an empty prompt: the prefix or
+    suffix carries the run instead.
+    """
+    prefix = str(profile.get("prompt_prefix", "") or "").strip()
+    suffix = str(profile.get("prompt_suffix", "") or "").strip()
+    return bool(prefix or suffix)
+
+
 def preset_reference_urls(profile: dict[str, Any]) -> list[str]:
     """Return a profile's optional ``reference_images`` list, validated.
 

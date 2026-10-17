@@ -57,6 +57,10 @@ The media type follows the URL — an `.mp4`/`.mov` URL makes the Markdown file 
 That is why a video model can be used from the same input format with no
 special casing.
 
+The prompt may also be a fenced block (opened with ```prompt, or a bare
+fence); the block may be empty when the profile's prefix/suffix carries the
+run (an edit or upscale profile, typically).
+
 ### The sidecar
 
 Every generated image or video gets a matching `.md` sidecar holding its public
