@@ -86,7 +86,7 @@ The Image Generator (Generator) delegates all API/provider logic to Engine plugi
 - After engine load, `copy_standby_profiles()` seeds `USER-FILES/02.STANDBY/` from the engine package
 
 ### Supported Platforms
-`replicate`, `fal`, `openrouter`, `google`, `beeble`, `evolink` — new engines added by installing the corresponding package.
+`replicate`, `fal`, `openrouter`, `google`, `beeble`, `evolink`, `spicyapi` — new engines added by installing the corresponding package.
 
 ### Processing Flow
 
