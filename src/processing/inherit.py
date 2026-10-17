@@ -26,6 +26,7 @@ FETCH_TIMEOUT = 30.0
 FETCH_WORKERS = 8
 MAX_DOWNLOAD = 128 * 1024 * 1024
 _USER_AGENT = "ImageGenerator/1.0"
+INHERIT_FAILED_SUFFIX = "_PROMPT_INHERITANCE_FAILED"
 
 
 def fetch_image(url: str, timeout: float = FETCH_TIMEOUT) -> bytes | None:
@@ -109,3 +110,37 @@ def _record(url: str, recipe: dict[str, Any]) -> dict[str, Any] | None:
         "suffix": suffix,
         "source": source,
     }
+
+
+def mark_failed_inheritance(results: list[Any], failed: set[str], stamped: set[str]) -> None:
+    """Suffix each generated file whose prompt inheritance did not resolve.
+
+    Renames the file in place *before* payload composition, so the recipe's
+    ``output_file`` records the final (suffixed) name; a path stamped during
+    its save event is un-skipped so the end-of-run pass re-stamps it under the
+    new name (the inject merge preserves cull marks). Best effort: a rename
+    that cannot happen only warns — except a file that is already gone (moved
+    out of the output folder), which stays silent like the payload pass.
+    """
+    if not failed:
+        return
+    for result in results:
+        if getattr(result, "status", "") != "ok" or getattr(result, "path", None) is None:
+            continue
+        if str(getattr(result, "source_path", "")) not in failed:
+            continue
+        old = result.path
+        new = old.with_name(old.stem + INHERIT_FAILED_SUFFIX + old.suffix)
+        if not old.exists():
+            logger.debug(f"Inheritance marker skipped for {old.name}: file no longer present")
+            continue
+        if new.exists():
+            logger.warning(f"Inheritance marker skipped for {old.name}: {new.name} exists")
+            continue
+        try:
+            old.rename(new)
+        except OSError as exc:
+            logger.warning(f"Inheritance marker failed for {old.name}: {exc}")
+            continue
+        result.path = new
+        stamped.discard(str(old))

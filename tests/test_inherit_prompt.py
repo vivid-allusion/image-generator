@@ -8,11 +8,12 @@ from types import ModuleType, SimpleNamespace
 
 import pytest
 from loguru import logger
+from PIL import Image
 
 from src.exceptions import ConfigurationError
 from src.processing.context import PipelineContext
-from src.processing.inherit import resolve_inherited_prompts
-from src.processing.payload import compose_payload
+from src.processing.inherit import mark_failed_inheritance, resolve_inherited_prompts
+from src.processing.payload import compose_payload, read_payload
 from src.processing.payload_containers import inject_jpeg
 from src.processing.profiles import inherit_prompt_enabled, profile_has_prompt_text
 
@@ -78,6 +79,44 @@ def _ctx(tmp_path: Path, md: dict, profile: dict | None = None) -> PipelineConte
         profile=profile or {},
         output_dir=tmp_path,
     )
+
+
+class _StagingStubEngine:
+    """Writes a real PNG per input and emits the engine's save-event protocol."""
+
+    PROVIDER_NAME = "Stub"
+    _on_progress = None
+
+    def __init__(self, output_dir: Path) -> None:
+        self.output_dir = output_dir
+
+    def run(self, inputs: list) -> list[SimpleNamespace]:
+        results = []
+        for index, item in enumerate(inputs):
+            dest = self.output_dir / f"{item.path.stem}-0{index}.png"
+            temp = self.output_dir / f".{dest.name}.part"
+            Image.new("RGB", (16, 16), (0, 0, 255)).save(temp, format="PNG")
+            if self._on_progress:
+                self._on_progress(
+                    SimpleNamespace(
+                        message=f"Saved: {dest.name}",
+                        current=index + 1,
+                        total=len(inputs),
+                        saved_path=temp,
+                        final_path=dest,
+                    )
+                )
+            temp.replace(dest)
+            results.append(
+                SimpleNamespace(
+                    status="ok",
+                    source_path=item.path,
+                    path=dest,
+                    error_msg="",
+                    expected_path=None,
+                )
+            )
+        return results
 
 
 # ── the profile key ──────────────────────────────────────────────────────────
@@ -310,3 +349,72 @@ def test_pipeline_stamps_the_inherited_prompt_but_sends_the_run_prompt(monkeypat
     assert payload["instruction"] == "upscale this to 4K"
     assert payload["inherited_from"]["url"] == FIRST
     assert payload["schema"] == 1
+
+
+def test_failed_inheritance_marks_the_output_and_restamps(monkeypatch, tmp_path):
+    """Outputs whose inheritance did not resolve gain the marker suffix, and a
+    file stamped on its save event is re-stamped under the new name."""
+    import src.main_simple as main_simple
+
+    class InputFile:
+        def __init__(self, *, path, prompt, reference_urls, metadata):
+            self.path = path
+            self.prompt = prompt
+            self.reference_urls = reference_urls
+            self.metadata = metadata
+
+    module = ModuleType("engine_replicate")
+    module.InputFile = InputFile
+    monkeypatch.setitem(sys.modules, "engine_replicate", module)
+
+    def fake_fetch(url: str, timeout: float | None = None) -> bytes | None:
+        return _image_bytes(_recipe_text()) if url == FIRST else None
+
+    monkeypatch.setattr("src.processing.inherit.fetch_image", fake_fetch)
+
+    in_dir = tmp_path / "in"
+    in_dir.mkdir()
+    md_ok = {"path": in_dir / "ok.md", "prompt": "upscale this", "reference_urls": [FIRST]}
+    md_bad = {"path": in_dir / "bad.md", "prompt": "upscale this too", "reference_urls": [SECOND]}
+    md_plain = {"path": in_dir / "plain.md", "prompt": "a castle", "reference_urls": []}
+
+    ctx = PipelineContext(
+        md_files=[md_ok, md_bad, md_plain],
+        engine=_StagingStubEngine(tmp_path),
+        platform="replicate",
+        profile={"inherit_prompt": True, "endpoint": "x", "parameters": {}},
+        output_dir=tmp_path,
+        input_root=in_dir,
+        save_payloads=True,
+        logs=False,
+        run_mode="studiolot",
+    )
+
+    assert main_simple._execute_pipeline(ctx) == 0
+
+    ok_path = tmp_path / "ok-00.png"
+    bad_path = tmp_path / "bad-01_PROMPT_INHERITANCE_FAILED.png"
+    plain_path = tmp_path / "plain-02_PROMPT_INHERITANCE_FAILED.png"
+    assert ok_path.exists()
+    assert not (tmp_path / "bad-01.png").exists()
+    assert bad_path.exists()
+    assert plain_path.exists()
+
+    inherited_payload = read_payload(ok_path)
+    assert inherited_payload["instruction"] == "upscale this"
+    assert inherited_payload["inherited_from"]["url"] == FIRST
+
+    marked = read_payload(bad_path)
+    assert marked["output_file"] == bad_path.name
+    assert marked["prompt"]["raw"] == "upscale this too"
+    assert "inherited_from" not in marked
+
+
+def test_mark_failed_inheritance_is_best_effort(tmp_path):
+    result = SimpleNamespace(
+        status="ok", source_path=tmp_path / "gone.md", path=tmp_path / "gone-00.png"
+    )
+
+    mark_failed_inheritance([result], {str(tmp_path / "gone.md")}, set())
+
+    assert result.path == tmp_path / "gone-00.png"

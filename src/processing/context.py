@@ -26,3 +26,4 @@ class PipelineContext:
     run_mode: str = "standalone"
     cli_args: dict[str, Any] = field(default_factory=dict)
     inherited: dict[str, dict[str, Any]] = field(default_factory=dict)
+    inherit_failed: set[str] = field(default_factory=set)

@@ -103,6 +103,7 @@ USER-FILES/05.OUTPUT/YYMMDD_HHMMSS_IMG/
 ```
 
 - Each image embeds its generation payload (prompt, endpoint, parameters) as XMP metadata in PNG/JPEG/WebP — inspect with exiftool/ImageMagick
+- With `inherit_prompt` on, an output whose prompt inheritance did not resolve keeps this run's prompt and gains a `_PROMPT_INHERITANCE_FAILED` suffix before its extension, so it is visible at a glance
 - Failed generations (in a mixed run) get red error-placeholder images so the output serial stays intact
 - All-failed runs exit 1 with a fallback `image_generator_<ts>.log`
 

@@ -28,7 +28,7 @@ from .exceptions import (
 )
 from .processing.context import PipelineContext
 from .processing.first_run import handle_first_run
-from .processing.inherit import resolve_inherited_prompts
+from .processing.inherit import mark_failed_inheritance, resolve_inherited_prompts
 from .processing.markdown_parser import read_markdown_files
 from .processing.payload import compose_run_payloads, embed_payloads, stamp_saved_file
 from .processing.placeholders import write_placeholders
@@ -102,9 +102,15 @@ def _report_results(results: list[Any], placeholders: int = 0) -> int:
 
 
 def _resolve_payload_inheritance(ctx: PipelineContext) -> None:
-    """Resolve each edit's source recipe once per run, before any engine call."""
-    if ctx.save_payloads and inherit_prompt_enabled(ctx.profile):
-        ctx.inherited = resolve_inherited_prompts(ctx.md_files)
+    """Resolve each edit's source recipe once per run, before any engine call.
+
+    ``ctx.inherit_failed`` holds every Markdown file that did not produce an
+    inherited prompt, so the outputs that follow carry the marker suffix.
+    """
+    if not (ctx.save_payloads and inherit_prompt_enabled(ctx.profile)):
+        return
+    ctx.inherited = resolve_inherited_prompts(ctx.md_files)
+    ctx.inherit_failed = {str(md["path"]) for md in ctx.md_files} - set(ctx.inherited)
 
 
 def _execute_pipeline(ctx: PipelineContext) -> int:
@@ -122,6 +128,7 @@ def _execute_pipeline(ctx: PipelineContext) -> int:
     except Exception:
         write_run_error_log(ctx, [], traceback_text=traceback.format_exc())
         raise
+    mark_failed_inheritance(results, ctx.inherit_failed, stamped)
     if any(getattr(r, "status", "") == "error" for r in results):
         write_run_error_log(ctx, results)
 
