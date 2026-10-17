@@ -25,3 +25,4 @@ class PipelineContext:
     logs: bool = False
     run_mode: str = "standalone"
     cli_args: dict[str, Any] = field(default_factory=dict)
+    inherited: dict[str, dict[str, Any]] = field(default_factory=dict)

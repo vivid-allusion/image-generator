@@ -100,7 +100,7 @@ main() → _run_standalone()
   → load_engine()                # real engine with chosen profile
   → read_markdown_files()        # parse .md inputs
   → _handle_preflight_checks()  # cost/dry-run early exit
-  → _execute_pipeline()          # build_inputs → engine.run() → report
+  → _execute_pipeline()          # resolve inheritance → build_inputs → engine.run() → report
 ```
 
 Studiolot mode:
@@ -112,7 +112,7 @@ main() → _run_studiolot()
   → _handle_preflight_checks()
   → get_api_key(platform)
   → _resolve_engine_for_studiolot()
-  → _execute_pipeline()
+  → _execute_pipeline()          # resolve inheritance → build_inputs → engine.run() → report
 ```
 
 ### CLI Modes
@@ -133,8 +133,9 @@ main() → _run_studiolot()
 | `src/engine_contract.py` | `EngineInputFile` protocol — shared contract for Engine.InputFile (requires `path`, `prompt`, `reference_urls`, `metadata`) |
 | `src/processing/markdown_parser.py` | `parse_markdown()`, `extract_prompt_text()`, `extract_all_image_urls()`, `read_markdown_files()` — prompted + URL parsing + directory batch reader |
 | `src/processing/first_run.py` | `handle_first_run()` — engine check, wizard launch, STANDBY seeding; extracted from `_run_standalone()` |
-| `src/processing/profiles.py` | Profile loading (standalone + studiolot) via `_parse_profile_yaml()`, empty-STANDBY guidance |
-| `src/processing/payload.py` | Generation payload: `compose_payload()` (recipe JSON schema v1, optional `error` field) + `error_info()` + `fit_payload()` + `compose_run_payloads()` (once-per-run composition) + `embed_payloads()` + `inject_payload()`/`read_payload()` |
+| `src/processing/inherit.py` | Payload inheritance: `resolve_inherited_prompts()` + `fetch_image()` — reads the first reference image's recipe back as the prompt of record; best-effort, warns and falls back |
+| `src/processing/profiles.py` | Profile loading (standalone + studiolot) via `_parse_profile_yaml()`, empty-STANDBY guidance, `inherit_prompt_enabled()` guard |
+| `src/processing/payload.py` | Generation payload: `compose_payload()` (recipe JSON schema v1, optional error field; merges an inherited prompt from `ctx.inherited`) + `error_info()` + `fit_payload()` + `compose_run_payloads()` (once-per-run composition) + `embed_payloads()` + `inject_payload()`/`read_payload()`/`parse_payload_bytes()` |
 | `src/processing/placeholders.py` | Generator-side error placeholders: `write_placeholders()` + `derive_size()` + `render_placeholder()` (Pillow) |
 | `src/processing/payload_containers.py` | Pure byte transforms: XMP packet serializer, PNG iTXt / JPEG APP1 / WebP `XMP ` chunk envelopes + readers, `detect_format()` |
 | `src/processing/context.py` | `PipelineContext` dataclass — shared orchestration state for payload/placeholder/log stages |
@@ -154,6 +155,7 @@ main() → _run_studiolot()
 - Profiles: YAML files in `USER-FILES/03.PROFILES/` (production) or `USER-FILES/02.STANDBY/` (engine-seeded backup)
 - Profile format: `platform`, `parameters`, `prompt_prefix`, `prompt_suffix`, `pricing`, `paths`, `delay_between_requests`
 - Profile format may include an optional top-level `reference_images` list (URLs); they are appended after each Markdown file’s own `reference_urls`.
+- Profile format may include an optional top-level `inherit_prompt` boolean (default `false`): with it on, a run's *first* `reference_urls` image is fetched and its embedded recipe (if any) becomes the new file's prompt of record — text, prefix and suffix — while this run's endpoint/parameters/timestamps stay truthful, the run's own wording is kept under `instruction`, and the source is recorded under `inherited_from`. A reference without a recipe warns and falls back to the run's own prompt. CLI override: `--inherit-prompt` / `--no-inherit-prompt`.
 - Standby profiles are engine-owned: `02.STANDBY/` is seeded by `copy_standby_profiles()` after engine install. Starts empty (`.gitkeep` only). Content is gitignored — only `.gitkeep` is tracked.
 - API keys: env vars per platform (`REPLICATE_API_TOKEN`, `FAL_KEY`, `OPENROUTER_API_KEY`, `GOOGLE_API_KEY`, `BEEBLE_API_KEY`, `EVOLINK_API_KEY`)
 - .env file: loaded from project root on startup

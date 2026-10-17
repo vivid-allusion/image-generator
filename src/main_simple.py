@@ -28,10 +28,12 @@ from .exceptions import (
 )
 from .processing.context import PipelineContext
 from .processing.first_run import handle_first_run
+from .processing.inherit import resolve_inherited_prompts
 from .processing.markdown_parser import read_markdown_files
 from .processing.payload import compose_run_payloads, embed_payloads, stamp_saved_file
 from .processing.placeholders import write_placeholders
 from .processing.profiles import (
+    inherit_prompt_enabled,
     load_profile_standalone,
     load_profile_studiolot,
 )
@@ -65,6 +67,8 @@ def _prepare_profile(
     """Apply CLI overrides and resolve the active platform into the profile."""
     prepared = _apply_cli_overrides(profile, args)
     prepared["platform"] = args.platform or prepared.get("platform") or default_platform
+    if getattr(args, "inherit_prompt", None) is not None:
+        prepared["inherit_prompt"] = bool(args.inherit_prompt)
     return prepared
 
 
@@ -96,13 +100,21 @@ def _report_results(results: list[Any], placeholders: int = 0) -> int:
     return 1 if failed else 0
 
 
+def _resolve_payload_inheritance(ctx: PipelineContext) -> None:
+    """Resolve each edit's source recipe once per run, before any engine call."""
+    if ctx.save_payloads and inherit_prompt_enabled(ctx.profile):
+        ctx.inherited = resolve_inherited_prompts(ctx.md_files)
+
+
 def _execute_pipeline(ctx: PipelineContext) -> int:
-    """Run the core generation pipeline: build inputs → run → report → log.
+    """Run the core generation pipeline: resolve inheritance → build inputs →
+    run → report → log.
 
     The run-level ``_ERROR.log`` is always written when the engine run ends
     with failed items or raises (the raise is re-raised after the log) —
     unlike `ctx.logs`, it is never opt-in.
     """
+    _resolve_payload_inheritance(ctx)
     inputs = build_inputs(ctx.md_files, ctx.platform, ctx.input_root, profile=ctx.profile)
     try:
         results, stamped = _run_with_progress(ctx, inputs)

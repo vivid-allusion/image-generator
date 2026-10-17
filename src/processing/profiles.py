@@ -36,6 +36,21 @@ def load_profile_studiolot(profile_path: Path) -> dict[str, Any]:
     return _parse_profile_yaml(profile_path)
 
 
+def inherit_prompt_enabled(profile: dict[str, Any]) -> bool:
+    """Return the profile's optional ``inherit_prompt`` flag, validated.
+
+    Absent or ``None`` → ``False`` (the byte-identical path). Only a real
+    boolean is accepted; anything else is malformed and raises
+    ``ConfigurationError`` (fail loud, never a silent drop).
+    """
+    value = profile.get("inherit_prompt")
+    if value is None:
+        return False
+    if not isinstance(value, bool):
+        raise ConfigurationError("profile 'inherit_prompt' must be true or false")
+    return value
+
+
 def preset_reference_urls(profile: dict[str, Any]) -> list[str]:
     """Return a profile's optional ``reference_images`` list, validated.
 

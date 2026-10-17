@@ -68,6 +68,24 @@ _ARGUMENTS: list[_ArgumentSpec] = [
         },
     },
     {
+        "flags": ["--inherit-prompt"],
+        "kwargs": {
+            "action": "store_true",
+            "default": None,
+            "dest": "inherit_prompt",
+            "help": "Keep the first reference image's own recipe prompt when editing "
+            "it (overrides the profile's inherit_prompt)",
+        },
+    },
+    {
+        "flags": ["--no-inherit-prompt"],
+        "kwargs": {
+            "action": "store_false",
+            "dest": "inherit_prompt",
+            "help": "Record this run's own prompt, even when the profile enables inherit_prompt",
+        },
+    },
+    {
         "flags": ["--install-default-engine"],
         "kwargs": {
             "type": str,

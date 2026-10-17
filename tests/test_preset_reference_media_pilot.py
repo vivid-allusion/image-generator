@@ -144,7 +144,9 @@ def test_dry_run_preflight_exits_without_composing(tmp_path):
 
 
 def test_no_new_cli_flag_profile_is_the_only_transport():
-    """W22 adds no CLI flag; the composed profile is the only transport (plan §2)."""
+    """W22 adds no CLI flag for reference media; the composed profile is the
+    only transport (plan §2). The inherit_prompt override flags are a later
+    workstream and unrelated to reference media."""
     from src.cli import _ARGUMENTS
 
     flags = {flag for spec in _ARGUMENTS for flag in spec["flags"]}
@@ -162,6 +164,8 @@ def test_no_new_cli_flag_profile_is_the_only_transport():
         "--cost-estimation",
         "--force-png",
         "--no-save-payloads",
+        "--inherit-prompt",
+        "--no-inherit-prompt",
         "--install-default-engine",
     }
     assert not any("reference" in flag or "preset" in flag for flag in flags)

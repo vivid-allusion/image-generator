@@ -1,7 +1,8 @@
 """Generation payload embedding — marry each generated image to its recipe.
 
 compose_payload() builds the recipe JSON (schema v1); inject_payload()
-embeds it as an XMP packet in PNG/JPEG/WebP; read_payload() reverses it.
+embeds it as an XMP packet in PNG/JPEG/WebP; read_payload() reverses it for
+a file on disk, parse_payload_bytes() for image bytes in memory.
 """
 
 import json
@@ -58,6 +59,19 @@ def compose_payload(
     suffix = str(ctx.profile.get("prompt_suffix", "") or "")
     preset_refs = preset_reference_urls(ctx.profile)
     raw = md_file["prompt"]
+    instruction = f"{prefix}{raw}{suffix}".strip()
+    inherited = (ctx.inherited or {}).get(str(md_file["path"]))
+    inherited_from: dict[str, Any] | None = None
+    if inherited:
+        # The prompt of record comes from the source image; this run's own
+        # wording stays as `instruction`, the source image as `inherited_from`
+        # (see inherit.py for how a record is resolved).
+        prompt_block = dict(inherited["prompt"])
+        prefix = inherited["prefix"]
+        suffix = inherited["suffix"]
+        inherited_from = inherited["source"]
+    else:
+        prompt_block = {"raw": raw, "wrapped": instruction}
     payload: dict[str, Any] = {
         "schema": 1,
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -68,7 +82,7 @@ def compose_payload(
         },
         "endpoint": ctx.profile.get("endpoint", ""),
         "parameters": dict(ctx.profile.get("parameters", {})),
-        "prompt": {"raw": raw, "wrapped": f"{prefix}{raw}{suffix}".strip()},
+        "prompt": prompt_block,
         "prefix": prefix,
         "suffix": suffix,
         "reference_urls": list(md_file["reference_urls"]),
@@ -79,6 +93,9 @@ def compose_payload(
         "video_duration": "",
         "output_file": out_path.name,
     }
+    if inherited_from is not None:
+        payload["instruction"] = instruction
+        payload["inherited_from"] = inherited_from
     if preset_refs:
         payload["preset_reference_urls"] = preset_refs
     if error is not None:
@@ -218,9 +235,8 @@ def inject_payload(
     os.replace(tmp, path)
 
 
-def read_payload(path: Path) -> dict[str, Any] | None:
-    """Return the embedded payload, or None if the file carries none."""
-    data = path.read_bytes()
+def parse_payload_bytes(data: bytes) -> dict[str, Any] | None:
+    """Return the recipe embedded in image bytes, or None if they carry none."""
     fmt = detect_format(data)
     if fmt == "png":
         xml = read_png(data)
@@ -239,3 +255,8 @@ def read_payload(path: Path) -> dict[str, Any] | None:
         return json.loads(text)
     except ValueError:
         return None
+
+
+def read_payload(path: Path) -> dict[str, Any] | None:
+    """Return the embedded payload, or None if the file carries none."""
+    return parse_payload_bytes(path.read_bytes())

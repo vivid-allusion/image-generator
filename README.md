@@ -66,6 +66,7 @@ parameters:                    # passed to the API unchanged
   output_format: "png"
 prompt_prefix: ""
 prompt_suffix: ""
+inherit_prompt: false          # true keeps the first reference image's own prompt (edit/upscale runs)
 pricing:
   base_cost: 0.05              # used by --cost-estimation
 paths:
