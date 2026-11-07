@@ -30,6 +30,11 @@ def find_project_engines_dir(start_dir: Path, max_depth: int = 10) -> Path | Non
     return None
 
 
+def find_generator_engines_dir() -> Path:
+    """Return <generator-root>/ENGINES/."""
+    return Path(__file__).resolve().parent.parent / "ENGINES"
+
+
 def print_engine_not_found(platform: str) -> None:
     from .auth import SUPPORTED_PLATFORMS, _key_name
 

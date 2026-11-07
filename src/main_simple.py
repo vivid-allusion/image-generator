@@ -17,6 +17,7 @@ from .cli import parse_args
 from .constants import DEFAULT_PLATFORM, __version__
 from .engine_helpers import (
     build_inputs,
+    find_generator_engines_dir,
     find_project_engines_dir,
     make_engine_ctx,
 )
@@ -249,12 +250,15 @@ def _resolve_engine_for_studiolot(
     api_key: str | None,
 ) -> Any:
     project_engines = find_project_engines_dir(output_dir)
-    if not project_engines:
-        raise FileNotFoundError(
-            "Engine directory not found. Expected .00_TOOLS/GENERATORS/ENGINES/ "
-            "under the project root."
+    if project_engines:
+        search_paths = [project_engines]
+    else:
+        search_paths = [find_generator_engines_dir()]
+        logger.info(
+            "No .00_TOOLS/GENERATORS/ENGINES/ under the output tree - using the "
+            "generator's own ENGINES/"
         )
-    return _load_engine_with_ctx(platform, [project_engines], profile, output_dir, api_key)
+    return _load_engine_with_ctx(platform, search_paths, profile, output_dir, api_key)
 
 
 # ── entry point ────────────────────────────────────────────────────────────────
