@@ -17,7 +17,7 @@ from .utils.path_resolver import relative_posix
 
 
 def find_project_engines_dir(start_dir: Path, max_depth: int = 10) -> Path | None:
-    """Walk up from start_dir looking for .00_TOOLS/GENERATORS/ENGINES/ (or the old 00_APPLICATIONS/ENGINES/)."""
+    """Walk up from start_dir to .00_TOOLS/GENERATORS/ENGINES/ (or old 00_APPLICATIONS/ENGINES/)."""
     current = start_dir.resolve()
     for _ in range(max_depth):
         for parts in ((".00_TOOLS", "GENERATORS", "ENGINES"), ("00_APPLICATIONS", "ENGINES")):
