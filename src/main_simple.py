@@ -251,7 +251,7 @@ def _resolve_engine_for_studiolot(
     project_engines = find_project_engines_dir(output_dir)
     if not project_engines:
         raise FileNotFoundError(
-            "Engine directory not found. Expected 00_APPLICATIONS/ENGINES/ "
+            "Engine directory not found. Expected .00_TOOLS/GENERATORS/ENGINES/ "
             "under the project root."
         )
     return _load_engine_with_ctx(platform, [project_engines], profile, output_dir, api_key)
