@@ -19,7 +19,10 @@ PRD Reference: Section 05.1, 06.2
 """
 
 import re
+import random
 import sys
+import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from collections.abc import Callable
@@ -211,8 +214,30 @@ def extract_all_image_urls(
     return urls
 
 
+DOOR_WORKERS = 4  # the picture door allows 4 requests at once per reader
+_RETRY_CODES = (429, 503)
+_MAX_RETRIES = 6
+_MAX_WAIT = 30.0
+
+
+def urlopen_patiently(req: urllib.request.Request, timeout: float):
+    """urlopen that waits out a 429/503 (Retry-After, else backoff) a few times."""
+    for attempt in range(_MAX_RETRIES + 1):
+        try:
+            return urllib.request.urlopen(req, timeout=timeout)
+        except urllib.error.HTTPError as e:
+            if e.code not in _RETRY_CODES or attempt == _MAX_RETRIES:
+                raise
+            try:
+                wait = float(e.headers.get("Retry-After", ""))
+            except (TypeError, ValueError):
+                wait = 0.5 * 2**attempt + random.uniform(0, 0.5)
+            time.sleep(min(max(wait, 0.0), _MAX_WAIT))
+    raise AssertionError("unreachable")
+
+
 def validate_image_urls(
-    urls: list[str], timeout: float = 5.0, workers: int = 8
+    urls: list[str], timeout: float = 5.0, workers: int = DOOR_WORKERS
 ) -> tuple[list[str], list[str]]:
     """Validate image URLs are reachable via HEAD request.
 
@@ -240,7 +265,7 @@ def _check_url(url: str, headers: dict[str, str], timeout: float) -> bool:
         req = urllib.request.Request(
             _normalize_url(url), method="HEAD", headers=headers
         )
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with urlopen_patiently(req, timeout) as resp:
             return resp.status < 400
     except Exception as e:
         logger.debug(f"URL check failed for {url}: {type(e).__name__}: {e}")

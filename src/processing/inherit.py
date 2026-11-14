@@ -20,10 +20,11 @@ from typing import Any
 from loguru import logger
 
 from ..datatypes import MarkdownFile
+from .markdown_parser import DOOR_WORKERS, urlopen_patiently
 from .payload import parse_payload_bytes
 
 FETCH_TIMEOUT = 30.0
-FETCH_WORKERS = 8
+FETCH_WORKERS = DOOR_WORKERS
 MAX_DOWNLOAD = 128 * 1024 * 1024
 _USER_AGENT = "ImageGenerator/1.0"
 INHERIT_FAILED_SUFFIX = "_PROMPT_INHERITANCE_FAILED"
@@ -33,7 +34,7 @@ def fetch_image(url: str, timeout: float = FETCH_TIMEOUT) -> bytes | None:
     """Best-effort GET of one reference image; None on any failure."""
     try:
         req = urllib.request.Request(url, headers={"User-Agent": _USER_AGENT})
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with urlopen_patiently(req, timeout) as resp:
             return resp.read(MAX_DOWNLOAD)
     except Exception as e:
         logger.debug(f"Inherit fetch failed for {url}: {type(e).__name__}: {e}")

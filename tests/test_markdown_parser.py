@@ -266,7 +266,7 @@ class TestReadMarkdownFilesValidation:
         called = []
         monkeypatch.setattr(
             "src.processing.markdown_parser.validate_image_urls",
-            lambda urls, timeout=5.0, workers=8: called.append(urls) or ([], []),
+            lambda urls, timeout=5.0, workers=4: called.append(urls) or ([], []),
         )
         files = read_markdown_files(tmp_path)
         assert len(files) == 1
@@ -279,7 +279,7 @@ class TestReadMarkdownFilesValidation:
         )
         monkeypatch.setattr(
             "src.processing.markdown_parser.validate_image_urls",
-            lambda urls, timeout=5.0, workers=8: ([], list(urls)),
+            lambda urls, timeout=5.0, workers=4: ([], list(urls)),
         )
         assert read_markdown_files(tmp_path) == []
 
@@ -290,7 +290,7 @@ class TestReadMarkdownFilesValidation:
         )
         monkeypatch.setattr(
             "src.processing.markdown_parser.validate_image_urls",
-            lambda urls, timeout=5.0, workers=8: ([urls[0]], [urls[1]]),
+            lambda urls, timeout=5.0, workers=4: ([urls[0]], [urls[1]]),
         )
         assert read_markdown_files(tmp_path) == []
 
@@ -300,7 +300,7 @@ class TestReadMarkdownFilesValidation:
         )
         monkeypatch.setattr(
             "src.processing.markdown_parser.validate_image_urls",
-            lambda urls, timeout=5.0, workers=8: (list(urls), []),
+            lambda urls, timeout=5.0, workers=4: (list(urls), []),
         )
         files = read_markdown_files(tmp_path)
         assert len(files) == 1
@@ -328,7 +328,7 @@ class TestReadMarkdownFilesEmptyPrompt:
         )
         monkeypatch.setattr(
             "src.processing.markdown_parser.validate_image_urls",
-            lambda urls, timeout=5.0, workers=8: (list(urls), []),
+            lambda urls, timeout=5.0, workers=4: (list(urls), []),
         )
         files = read_markdown_files(tmp_path, allow_empty_prompt=True)
         assert len(files) == 1
@@ -341,7 +341,7 @@ class TestReadMarkdownFilesEmptyPrompt:
         )
         monkeypatch.setattr(
             "src.processing.markdown_parser.validate_image_urls",
-            lambda urls, timeout=5.0, workers=8: (list(urls), []),
+            lambda urls, timeout=5.0, workers=4: (list(urls), []),
         )
         files = read_markdown_files(tmp_path, allow_empty_prompt=True)
         assert len(files) == 1
