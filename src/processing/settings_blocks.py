@@ -42,6 +42,13 @@ def resolve_settings(raw: dict[str, str], params: dict[str, Any] | None) -> dict
                 raise ValueError(f"```{block} block: {value!r} is not on/off/true/false/yes/no")
             out[block] = _BOOLS[value.lower()]
             continue
+        if spec.get("type") in ("integer", "number"):
+            convert = int if spec["type"] == "integer" else float
+            try:
+                out[block] = convert(value)
+            except ValueError:
+                raise ValueError(f"```{block} block: {value!r} is not a {spec['type']}") from None
+            continue
         options = [str(o.get("value")) for o in spec.get("options", [])]
         if options and value not in options:
             raise ValueError(

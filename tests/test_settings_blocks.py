@@ -63,3 +63,10 @@ def test_read_rejects_bad_files_and_keeps_good_ones(tmp_path: Path) -> None:
         ("a_ok.md", {"aspect_ratio": "9:16"}),
         ("c_plain.md", {}),
     ]
+
+
+def test_resolve_converts_numbers_and_refuses_text() -> None:
+    params = {"seed": {"type": "integer"}, "scale": {"type": "number"}}
+    assert resolve_settings({"seed": "42", "scale": "1.5"}, params) == {"seed": 42, "scale": 1.5}
+    with pytest.raises(ValueError, match="seed block: 'abc'"):
+        resolve_settings({"seed": "abc"}, params)
