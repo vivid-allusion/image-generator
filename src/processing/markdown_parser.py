@@ -32,6 +32,7 @@ from pathlib import Path
 from loguru import logger
 
 from ..datatypes import MarkdownFile
+from .settings_blocks import endpoint_params, resolve_settings
 
 # A URL path can itself contain brackets (…_(3x4_cropped).png), so the URL body
 # allows balanced "(…)" groups instead of stopping at the first ")".
@@ -57,6 +58,8 @@ _STUDIO_FENCE = re.compile(r"^---\s*$")
 _STUDIO_ROOT_KEY = re.compile(r"^studio:\s*(?:#.*)?$")
 # An opening prompt fence: "```prompt" or a bare "```".
 _PROMPT_FENCE = re.compile(r"^```(?:\s*prompt)?\s*$", re.IGNORECASE)
+# Any other named fence is a setting block (```aspect_ratio, ```resolution, …).
+_SETTING_FENCE = re.compile(r"^```\s*([A-Za-z_]\w*)\s*$")
 
 
 def _is_studio_root(line: str) -> bool:
@@ -122,6 +125,34 @@ def _normalize_url(url: str) -> str:
     return urllib.parse.quote(url, safe=_URL_SAFE)
 
 
+def _take_settings(lines: list[str]) -> tuple[list[str], dict[str, str]]:
+    """Split ```<setting> blocks out of the lines; each yields its first non-empty line.
+
+    A ```prompt fence is opaque: a setting-looking fence inside it stays prompt text.
+    """
+    kept: list[str] = []
+    settings: dict[str, str] = {}
+    index = 0
+    while index < len(lines):
+        stripped = lines[index].strip()
+        named = _SETTING_FENCE.match(stripped)
+        is_setting = bool(named) and named.group(1).lower() != "prompt"
+        close = None
+        if is_setting or _PROMPT_FENCE.match(stripped):
+            close = next((i for i in range(index + 1, len(lines)) if lines[i].strip() == "```"), None)
+        if close is None:
+            kept.append(lines[index])
+            index += 1
+            continue
+        if is_setting:
+            first = next((ln.strip() for ln in lines[index + 1 : close] if ln.strip()), "")
+            settings.setdefault(named.group(1).lower(), first)
+        else:
+            kept.extend(lines[index : close + 1])
+        index = close + 1
+    return kept, settings
+
+
 def _scan_prompt(lines: list[str], warn: Callable[[str], None] | None) -> tuple[int, str, bool]:
     """Locate the prompt; return (index after it, prompt text, prompt found).
 
@@ -152,7 +183,9 @@ def _scan_prompt(lines: list[str], warn: Callable[[str], None] | None) -> tuple[
 
 
 def parse_markdown(
-    markdown_content: str, warn: Callable[[str], None] | None = None
+    markdown_content: str,
+    warn: Callable[[str], None] | None = None,
+    settings: dict[str, str] | None = None,
 ) -> tuple[str, list[str]]:
     """Parse a .md file, returning (prompt, image_urls) in one pass.
 
@@ -164,6 +197,8 @@ def parse_markdown(
     Args:
         markdown_content: Full markdown file content
         warn: Optional callback for format warnings (e.g. logger.warning)
+        settings: Optional dict that collects ```<setting> blocks (name → first
+            non-empty line); the blocks never reach the prompt.
 
     Returns:
         Tuple of (prompt_text, list_of_image_urls); the prompt may be empty.
@@ -173,6 +208,10 @@ def parse_markdown(
     skip_from = _studio_block_start(lines)
     if skip_from is not None:
         lines = lines[:skip_from]
+
+    lines, found = _take_settings(lines)
+    if settings is not None:
+        settings.update(found)
 
     index, prompt, seen_prompt = _scan_prompt(lines, warn)
     if not seen_prompt:
@@ -277,19 +316,37 @@ def _natural_sort_key(path: Path) -> list[str | int]:
     return [int(t) if t.isdigit() else t for t in re.split(r"(\d+)", path.name)]
 
 
-def read_markdown_files(input_dir: Path, allow_empty_prompt: bool = False) -> list[MarkdownFile]:
+def read_markdown_files(
+    input_dir: Path,
+    allow_empty_prompt: bool = False,
+    profile: dict | None = None,
+    search_paths: list[Path] | None = None,
+) -> list[MarkdownFile]:
     """Read .md files from input_dir, extract prompt + reference URLs.
 
     ``allow_empty_prompt`` admits files with no prompt text (an empty fence,
     or image embeds only): the profile's prefix/suffix then carries the run.
     Without it, such a file is rejected — loud, never a silent empty request.
+
+    Setting blocks are checked against the profile's model (see settings_blocks);
+    a refused block rejects the file. Accepted ones come back as ``settings``.
     """
     md_files = sorted(input_dir.rglob("*.md"), key=_natural_sort_key)
     result: list[MarkdownFile] = []
     rejected = 0
     for md_path in md_files:
         content = md_path.read_text(encoding="utf-8")
-        prompt, urls = parse_markdown(content, warn=logger.warning)
+        raw_settings: dict[str, str] = {}
+        prompt, urls = parse_markdown(content, warn=logger.warning, settings=raw_settings)
+        settings: dict = {}
+        if raw_settings:
+            try:
+                params = endpoint_params(profile or {}, search_paths or [])
+                settings = resolve_settings(raw_settings, params)
+            except ValueError as e:
+                logger.error(f"Rejected {md_path.name}: {e}")
+                rejected += 1
+                continue
         if not prompt:
             if not allow_empty_prompt:
                 logger.error(
@@ -314,7 +371,9 @@ def read_markdown_files(input_dir: Path, allow_empty_prompt: bool = False) -> li
                 )
                 rejected += 1
                 continue
-        result.append({"path": md_path, "prompt": prompt, "reference_urls": urls})
+        result.append(
+            {"path": md_path, "prompt": prompt, "reference_urls": urls, "settings": settings}
+        )
     if rejected and not result:
         logger.error(f"All {rejected} Markdown file(s) rejected — nothing to generate")
     if not result:

@@ -1,7 +1,7 @@
 """Shared type definitions for the application."""
 
 from pathlib import Path
-from typing import TypedDict
+from typing import Any, NotRequired, TypedDict
 
 
 class MarkdownFile(TypedDict):
@@ -10,3 +10,4 @@ class MarkdownFile(TypedDict):
     path: Path
     prompt: str
     reference_urls: list[str]
+    settings: NotRequired[dict[str, Any]]  # accepted ```<setting> blocks, this file only

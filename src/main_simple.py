@@ -148,6 +148,23 @@ def _execute_pipeline(ctx: PipelineContext) -> int:
     return exit_code
 
 
+def _execute_by_settings(
+    md_files: list[Any],
+    load: Any,
+    profile: dict[str, Any],
+    make_ctx: Any,
+) -> int:
+    """One engine run per distinct set of per-file setting overrides."""
+    groups: dict[tuple, list[Any]] = {}
+    for md in md_files:
+        groups.setdefault(tuple(sorted((md.get("settings") or {}).items())), []).append(md)
+    codes = []
+    for key, files in groups.items():
+        p = {**profile, "parameters": {**profile.get("parameters", {}), **dict(key)}}
+        codes.append(_execute_pipeline(make_ctx(files, load(p), p)))
+    return max(codes)
+
+
 def _logs_enabled(args: Any, run_mode: str) -> bool:
     """Run logs are opt-in (-l/--logs) and standalone-only."""
     return bool(getattr(args, "logs", False)) and run_mode == "standalone"
@@ -243,21 +260,24 @@ def _load_engine_with_ctx(
     return load_engine(make_engine_ctx(platform, search_paths, profile, output_dir, api_key))
 
 
+def _studiolot_search_paths(output_dir: Path) -> list[Path]:
+    project_engines = find_project_engines_dir(output_dir)
+    if project_engines:
+        return [project_engines]
+    logger.info(
+        "No .00_TOOLS/GENERATORS/ENGINES/ under the output tree - using the "
+        "generator's own ENGINES/"
+    )
+    return [find_generator_engines_dir()]
+
+
 def _resolve_engine_for_studiolot(
     output_dir: Path,
     platform: str,
     profile: dict[str, Any],
     api_key: str | None,
 ) -> Any:
-    project_engines = find_project_engines_dir(output_dir)
-    if project_engines:
-        search_paths = [project_engines]
-    else:
-        search_paths = [find_generator_engines_dir()]
-        logger.info(
-            "No .00_TOOLS/GENERATORS/ENGINES/ under the output tree - using the "
-            "generator's own ENGINES/"
-        )
+    search_paths = _studiolot_search_paths(output_dir)
     return _load_engine_with_ctx(platform, search_paths, profile, output_dir, api_key)
 
 
@@ -315,25 +335,24 @@ def _run_studiolot(args) -> int:
 
     input_dir = Path(args.input_dir) if args.input_dir else Path(".")
 
-    md_files = read_markdown_files(input_dir, allow_empty_prompt=profile_has_prompt_text(profile))
+    md_files = read_markdown_files(
+        input_dir,
+        allow_empty_prompt=profile_has_prompt_text(profile),
+        profile=profile,
+        search_paths=_studiolot_search_paths(output_dir),
+    )
     if not md_files:
         raise FileNotFoundError(f"No .md files found in {input_dir}")
     _handle_preflight_checks(args, md_files, profile)
 
     api_key = get_api_key(platform)
-    engine = _resolve_engine_for_studiolot(output_dir, platform, profile, api_key)
-
-    return _execute_pipeline(
-        _make_pipeline_context(
-            md_files,
-            engine,
-            platform,
-            profile,
-            output_dir,
-            input_dir,
-            args,
-            run_mode="studiolot",
-        )
+    return _execute_by_settings(
+        md_files,
+        lambda p: _resolve_engine_for_studiolot(output_dir, platform, p, api_key),
+        profile,
+        lambda files, engine, p: _make_pipeline_context(
+            files, engine, platform, p, output_dir, input_dir, args, run_mode="studiolot"
+        ),
     )
 
 
@@ -367,7 +386,12 @@ def _run_standalone(args) -> int:
     # ── check inputs before creating output dir ──────────────────────────────
 
     input_path = resolve_input_path(profile)
-    md_files = read_markdown_files(input_path, allow_empty_prompt=profile_has_prompt_text(profile))
+    md_files = read_markdown_files(
+        input_path,
+        allow_empty_prompt=profile_has_prompt_text(profile),
+        profile=profile,
+        search_paths=search_paths,
+    )
     _handle_preflight_checks(args, md_files, profile)
 
     if not md_files:
@@ -393,19 +417,13 @@ def _run_standalone(args) -> int:
 
     # ── engine with proper profile ───────────────────────────────────────────
 
-    engine = _load_engine_with_ctx(platform, search_paths, profile, output_dir, api_key)
-
-    return _execute_pipeline(
-        _make_pipeline_context(
-            md_files,
-            engine,
-            platform,
-            profile,
-            output_dir,
-            input_path,
-            args,
-            run_mode="standalone",
-        )
+    return _execute_by_settings(
+        md_files,
+        lambda p: _load_engine_with_ctx(platform, search_paths, p, output_dir, api_key),
+        profile,
+        lambda files, engine, p: _make_pipeline_context(
+            files, engine, platform, p, output_dir, input_path, args, run_mode="standalone"
+        ),
     )
 
 
