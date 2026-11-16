@@ -6,6 +6,7 @@ This module provides functions to parse markdown files and extract:
 - Text prompt from the first non-empty line that is not a markdown image
 
 Format:
+    (optional) a `---` front matter block on line 1, skipped whole
     Line 1: Text prompt, or a ```prompt / ``` fenced block (its contents may
             be empty when the profile's prefix/suffix carries the run)
     Lines after: ![image](URL) or https://...  (multiple images supported)
@@ -67,22 +68,30 @@ def _is_studio_root(line: str) -> bool:
     return not line[:1].isspace() and bool(_STUDIO_ROOT_KEY.match(line.strip()))
 
 
-def _studio_block_start(lines: list[str]) -> int | None:
-    """Index of the opening fence of a trailing `studio:` markdown block.
+def _strip_front_matter(lines: list[str]) -> list[str]:
+    """Drop a `---` block that starts on line 1 and closes at the next `---`.
 
-    The IDE appends its cull marks as a `---`-fenced YAML block whose root key
-    is `studio:`. The block is metadata, not prompt or URL, so the parser skips
-    it whole. A fence is only recognised when the next non-blank line is the
-    root key at column zero, so a plain horizontal rule is never swallowed. No
-    YAML is parsed: a malformed block is skipped without error.
+    Whatever its keys, the block is metadata, never prompt or URL. An unclosed
+    opener is left alone.
+    """
+    if not lines or not _STUDIO_FENCE.match(lines[0].strip()):
+        return lines
+    end = next((i for i in range(1, len(lines)) if _STUDIO_FENCE.match(lines[i].strip())), None)
+    return lines if end is None else lines[end + 1 :]
+
+
+def _has_studio_block(lines: list[str]) -> bool:
+    """True when a `---` fence is followed by a column-zero `studio:` root key.
+
+    A plain horizontal rule never matches. No YAML is parsed.
     """
     for index, line in enumerate(lines):
         if not _STUDIO_FENCE.match(line.strip()):
             continue
         following = next((candidate for candidate in lines[index + 1 :] if candidate.strip()), None)
         if following is not None and _is_studio_root(following):
-            return index
-    return None
+            return True
+    return False
 
 
 def _check_line(line: str, lineno: int, warn: Callable[[str], None] | None) -> None:
@@ -202,12 +211,17 @@ def parse_markdown(
 
     Returns:
         Tuple of (prompt_text, list_of_image_urls); the prompt may be empty.
+
+    Raises:
+        ValueError: If a `studio:` block sits anywhere but the front matter.
     """
-    markdown_content = _HTML_COMMENT_PATTERN.sub("", markdown_content)
-    lines = markdown_content.split("\n")
-    skip_from = _studio_block_start(lines)
-    if skip_from is not None:
-        lines = lines[:skip_from]
+    body = "\n".join(_strip_front_matter(markdown_content.split("\n")))
+    lines = _HTML_COMMENT_PATTERN.sub("", body).split("\n")
+    if _has_studio_block(lines):
+        raise ValueError(
+            "the studio: block is below the prompt; it now goes at the top of the file, "
+            "between two --- lines starting on line 1"
+        )
 
     lines, found = _take_settings(lines)
     if settings is not None:
@@ -337,7 +351,12 @@ def read_markdown_files(
     for md_path in md_files:
         content = md_path.read_text(encoding="utf-8")
         raw_settings: dict[str, str] = {}
-        prompt, urls = parse_markdown(content, warn=logger.warning, settings=raw_settings)
+        try:
+            prompt, urls = parse_markdown(content, warn=logger.warning, settings=raw_settings)
+        except ValueError as e:
+            logger.error(f"Rejected {md_path.name}: {e}")
+            rejected += 1
+            continue
         settings: dict = {}
         if raw_settings:
             try:

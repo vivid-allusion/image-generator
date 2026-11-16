@@ -11,8 +11,9 @@ import struct
 from pathlib import Path
 
 import pytest
+from loguru import logger
 
-from src.processing.markdown_parser import parse_markdown
+from src.processing.markdown_parser import parse_markdown, read_markdown_files
 from src.processing.payload import inject_payload, read_payload
 from src.processing.payload_containers import (
     XMP_NAMESPACE,
@@ -146,7 +147,7 @@ class TestJpegAndWebpReinject:
 
 
 STUDIO_BLOCK = (
-    "\n---\n"
+    "---\n"
     "studio:\n"
     "  marks:\n"
     "    rating: 3\n"
@@ -157,31 +158,48 @@ STUDIO_BLOCK = (
 
 
 class TestStudioMarkdownBlock:
-    def test_block_is_skipped_with_no_warnings(self):
+    def test_top_block_is_skipped_with_no_warnings(self):
         base = "Portrait of a detective\n\n![x](https://b2.example/character.png)"
         warnings: list[str] = []
 
-        with_block = parse_markdown(base + STUDIO_BLOCK, warn=warnings.append)
+        with_block = parse_markdown(STUDIO_BLOCK + base, warn=warnings.append)
         without_block = parse_markdown(base, warn=warnings.append)
 
         assert with_block == without_block
         assert with_block == ("Portrait of a detective", ["https://b2.example/character.png"])
         assert warnings == []
 
-    def test_malformed_trailing_block_is_skipped_without_crash(self):
-        content = "Prompt\n![x](https://a.example/1.png)\n---\nstudio:\n  marks: [broken\n"
+    def test_front_matter_without_studio_key_is_skipped(self):
+        content = "---\nPrompt Summary: an owl\n---\nAn owl turns its head\n"
 
-        assert parse_markdown(content) == ("Prompt", ["https://a.example/1.png"])
+        assert parse_markdown(content) == ("An owl turns its head", [])
+
+    def test_bottom_block_is_refused(self):
+        content = "Prompt\n![x](https://a.example/1.png)\n" + STUDIO_BLOCK
+
+        with pytest.raises(ValueError, match="top"):
+            parse_markdown(content)
+
+    def test_bottom_block_after_front_matter_is_refused(self):
+        content = "---\nPrompt Summary: x\n---\nPrompt\n" + STUDIO_BLOCK
+
+        with pytest.raises(ValueError, match="top"):
+            parse_markdown(content)
+
+    def test_bottom_block_file_is_rejected_by_name(self, tmp_path):
+        (tmp_path / "old.md").write_text("Prompt\n" + STUDIO_BLOCK)
+        said: list[str] = []
+        sink = logger.add(lambda m: said.append(str(m)), level="ERROR")
+        try:
+            assert read_markdown_files(tmp_path) == []
+        finally:
+            logger.remove(sink)
+        assert any("old.md" in line and "top" in line for line in said)
 
     def test_non_studio_fenced_block_is_not_swallowed(self):
         content = "Prompt\n---\nnote: value\n---\n"
 
         assert parse_markdown(content) == ("Prompt", [])
-
-    def test_block_after_raw_url(self):
-        content = "Prompt\nhttps://a.example/1.png" + STUDIO_BLOCK
-
-        assert parse_markdown(content) == ("Prompt", ["https://a.example/1.png"])
 
 
 def test_corpus_copies_are_byte_identical_to_origin():
