@@ -140,14 +140,19 @@ def compose_run_payloads(ctx: PipelineContext, results: list[Any]) -> dict[str, 
 
 
 def embed_payloads(
-    results: list[Any], payloads: dict[str, str], skip: set[str] | None = None
+    results: list[Any],
+    payloads: dict[str, str],
+    skip: set[str] | None = None,
+    md_files: list[Any] | None = None,
 ) -> None:
     """Embed each generated file's precomposed payload. Failures log and continue.
 
     ``skip`` holds destinations already stamped on their save event (see
     ``stamp_saved_file``) — those are never re-injected, so a file moved out of
     the output folder after it was stamped stays silent instead of erroring.
+    ``md_files`` supplies each source file's own prompt for a sidecar's line 1.
     """
+    by_source = index_md_files(md_files or [])
     for result in results:
         if getattr(result, "status", "") != "ok" or not getattr(result, "path", None):
             continue
@@ -157,7 +162,8 @@ def embed_payloads(
         if text is None:
             continue
         try:
-            stamp_file(result.path, result.path, text)
+            source = by_source.get(str(getattr(result, "source_path", "")))
+            stamp_file(result.path, result.path, text, source["prompt"] if source else "")
             logger.debug(f"Payload embedded: {result.path.name}")
         except FileNotFoundError:
             logger.warning(
@@ -197,25 +203,28 @@ def stamp_saved_file(
         return
     text = json.dumps(compose_payload(ctx, md_file, final), indent=2, ensure_ascii=False)
     try:
-        stamp_file(Path(saved), final, text)
+        stamp_file(Path(saved), final, text, md_file["prompt"])
     except Exception as exc:
         logger.debug(f"Payload stamp deferred for {final.name}: {exc}")
         return
     stamped.add(str(final))
 
 
-def stamp_file(path: Path, final: Path, text: str) -> None:
+def stamp_file(path: Path, final: Path, text: str, note: str = "") -> None:
     """Keep the recipe inside a picture, or in a ``<stem>.md`` sidecar for any other file.
 
     The sidecar is a prompt file this generator reads back: the recipe as a
-    front matter block, then the note, then the source picture URLs.
+    front matter block, then the note (the source file's own prompt line; an
+    empty note is an empty prompt fence, else the parser would take the first
+    URL as the prompt), then the source picture URLs.
     """
     if detect_format(path.read_bytes()) is not None:
         inject_payload(path, text=text)
         return
     payload = json.loads(text)
-    note = str(payload["prompt"]["raw"]).replace("\n", " ")
-    lines = ["---", text, "---", note, *payload["reference_urls"]]
+    note = note.replace("\n", " ").strip()
+    prompt_lines = [note] if note else ["```prompt", "```"]
+    lines = ["---", text, "---", *prompt_lines, *payload["reference_urls"]]
     final.with_suffix(".md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 

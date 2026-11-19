@@ -144,7 +144,7 @@ def _execute_pipeline(ctx: PipelineContext) -> int:
     if ctx.logs:
         write_run_logs(generated + placeholders, ctx.output_dir, ctx, payloads, results)
     if ctx.save_payloads:
-        embed_payloads(results, payloads, skip=stamped)
+        embed_payloads(results, payloads, skip=stamped, md_files=ctx.md_files)
     return exit_code
 
 

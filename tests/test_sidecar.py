@@ -20,7 +20,7 @@ TEXT = json.dumps(
 def test_glb_gets_sidecar_readable_by_parser(tmp_path: Path) -> None:
     glb = tmp_path / "m.glb"
     glb.write_bytes(b"glTF....")
-    stamp_file(glb, glb, TEXT)
+    stamp_file(glb, glb, TEXT, "A hamburger")
     side = tmp_path / "m.md"
     body = side.read_text()
     assert "tripo3d/tripo/v2.5/image-to-3d" in body and "texture" in body
@@ -51,3 +51,19 @@ def test_sidecar_failure_does_not_abort(tmp_path: Path) -> None:
         [SimpleNamespace(status="ok", path=p) for p in (a, b)], {str(a): TEXT, str(b): TEXT}
     )
     assert (tmp_path / "b.md").is_file()
+
+
+def test_empty_note_reads_back_as_empty_prompt(tmp_path: Path) -> None:
+    glb = tmp_path / "m.glb"
+    glb.write_bytes(b"glTF....")
+    stamp_file(glb, glb, TEXT, "")
+    assert parse_markdown((tmp_path / "m.md").read_text()) == ("", ["http://x/b.png"])
+
+
+def test_note_comes_from_source_file_not_recipe(tmp_path: Path) -> None:
+    glb = tmp_path / "m.glb"
+    glb.write_bytes(b"glTF....")
+    src = tmp_path / "in.md"
+    result = SimpleNamespace(status="ok", path=glb, source_path=src)
+    embed_payloads([result], {str(glb): TEXT}, md_files=[{"path": src, "prompt": "my note"}])
+    assert parse_markdown((tmp_path / "m.md").read_text())[0] == "my note"
