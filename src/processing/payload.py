@@ -157,7 +157,7 @@ def embed_payloads(
         if text is None:
             continue
         try:
-            inject_payload(result.path, text=text)
+            stamp_file(result.path, result.path, text)
             logger.debug(f"Payload embedded: {result.path.name}")
         except FileNotFoundError:
             logger.warning(
@@ -197,11 +197,26 @@ def stamp_saved_file(
         return
     text = json.dumps(compose_payload(ctx, md_file, final), indent=2, ensure_ascii=False)
     try:
-        inject_payload(Path(saved), text=text)
+        stamp_file(Path(saved), final, text)
     except Exception as exc:
         logger.debug(f"Payload stamp deferred for {final.name}: {exc}")
         return
     stamped.add(str(final))
+
+
+def stamp_file(path: Path, final: Path, text: str) -> None:
+    """Keep the recipe inside a picture, or in a ``<stem>.md`` sidecar for any other file.
+
+    The sidecar is a prompt file this generator reads back: the recipe as a
+    front matter block, then the note, then the source picture URLs.
+    """
+    if detect_format(path.read_bytes()) is not None:
+        inject_payload(path, text=text)
+        return
+    payload = json.loads(text)
+    note = str(payload["prompt"]["raw"]).replace("\n", " ")
+    lines = ["---", text, "---", note, *payload["reference_urls"]]
+    final.with_suffix(".md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def inject_payload(
